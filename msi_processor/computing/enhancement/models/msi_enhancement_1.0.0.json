@@ -1,0 +1,25 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "rad": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "psf": {"min_occurs": 1, "spec": {"required": true}},
+        "dark": {"min_occurs": 0, "spec": {"required": false}}
+      },
+      "outputs": {
+        "enh": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "denoise_method": {"required": false},
+        "denoise_params": {"required": false},
+        "bit_depth": {"required": false},
+        "fill_value": {"required": false},
+        "mtfc_regularization": {"required": false}
+      }
+    }
+  }
+}
