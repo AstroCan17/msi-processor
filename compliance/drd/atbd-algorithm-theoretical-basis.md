@@ -23,6 +23,11 @@
 > coefficients (gain/offset, dark, flat-field, ESUN, viewing model) appear here: they are supplied at
 > run time through the active profile and its ADFs, per the data policy (SRS <5.8>, REQ-S-01).
 
+> **Change note (CR):** the image-quality **enhancement** stage is **mandatory** (not optional) — its
+> "sharpening" sub-step is **MTF Compensation (MTFC) via PSF deconvolution** (`ALG-ENH-DECONV`, <5.5>),
+> a critical Level-1 radiometric/spatial restoration step that always runs; **denoising** (<5.4>)
+> remains a sensor-profile-configurable sub-step; **pan-sharpening** (<5.9>) is unchanged (optional).
+
 ---
 
 ## <1> Introduction
@@ -45,8 +50,8 @@ The ATBD covers the ten algorithmic subjects realised in the chain:
 | 1 | L0 decoding & loss handling (<5.1>) | `L0c → L1A` | REQ-F-L0-* |
 | 2 | Non-uniformity correction — dark/offset, PRNU, BPR (<5.2>) | `L1A →` | REQ-F-RAD-* |
 | 3 | TOA radiance & reflectance (<5.3>) | `→ L1B` | REQ-F-TOA-* |
-| 4 | Denoising (<5.4>) | within `L1A→L1B` | REQ-F-ENH-01 |
-| 5 | Sharpening / deconvolution (<5.5>) | within `L1A→L1B` | REQ-F-ENH-02 |
+| 4 | Denoising — sensor-profile-configurable (<5.4>) | within `L1A→L1B` | REQ-F-ENH-01 |
+| 5 | MTF compensation (MTFC) / PSF deconvolution — **mandatory** (<5.5>) | within `L1A→L1B` | REQ-F-ENH-02 |
 | 6 | Inter-band co-registration (<5.6>) | `L1B →` | REQ-F-COR-* |
 | 7 | Geo-referencing / orthorectification (<5.7>) | `→ L1C` | REQ-F-GEO-* |
 | 8 | Atmospheric correction (<5.8>) — **new / TBD** | `L1C → L2A` | REQ-F-ATM-* |
@@ -109,14 +114,16 @@ Gaussians; **CLAHE** contrast-limited adaptive histogram equalisation; **ADF** a
 algorithmic core (REQ-D-03). The chain and its level breakpoints:
 
 ```
-L0c ──[decode/loss/assemble]──► L1A ──[dark/PRNU/BPR ▸ (denoise/sharpen) ▸ DN→TOA]──► L1B
+L0c ──[decode/loss/assemble]──► L1A ──[dark/PRNU/BPR ▸ (denoise) ▸ MTFC ▸ DN→TOA]──► L1B
     ──[band co-reg ▸ georef/ortho ▸ (pan-sharpen)]──► L1C ──[atm. correction ▸ scene class/masks]──► L2A
 ```
 
-Stages in parentheses are profile-toggleable (optional). The chain is sensor-agnostic: every
-instrument constant — band set and centre wavelengths, detector/focal-plane geometry, calibration-ADF
-bindings, ESUN, viewing model, output CRS/grid, filter parameters — is supplied by the active profile
-(REQ-AD-01), never hard-coded in the core (REQ-D-04).
+Stages in parentheses are profile-toggleable: **denoise** (<5.4>) is sensor-profile-configurable and
+**pan-sharpen** (<5.9>) is optional. **MTF compensation (MTFC / PSF deconvolution, <5.5>) is a mandatory
+Level-1 image-quality step and always runs**, so the enhancement stage is mandatory. The chain is
+sensor-agnostic: every instrument constant — band set and centre wavelengths, detector/focal-plane
+geometry, calibration-ADF bindings, ESUN, viewing model, output CRS/grid, filter parameters — is
+supplied by the active profile (REQ-AD-01), never hard-coded in the core (REQ-D-04).
 
 ### <4.2> Common notation
 
@@ -356,7 +363,9 @@ the profile (the heritage hard-coded table is **not** carried over, per REQ-AD-0
 ### <5.4> Image-quality enhancement — denoising
 
 **Purpose.** Suppress sensor/acquisition noise (read noise, dark-current patterns, periodic/striping
-artefacts) without compromising radiometric integrity; optional and profile-selected. (Heritage:
+artefacts) without compromising radiometric integrity. This is a **sensor-profile-configurable**
+sub-step of the mandatory enhancement stage (it may be enabled/disabled per sensor; the stage still runs
+because MTF compensation, <5.5>, is mandatory). (Heritage:
 `level_1.py` `Denoiser` — Butterworth LP, wavelet VisuShrink, PCA, moving-average, Gaussian, FFT
 dark-noise removal.)
 
@@ -364,8 +373,9 @@ dark-noise removal.)
 concentrated at high/specific frequencies → low-pass / notch filtering), in a **multiresolution basis**
 (noise spread across small wavelet coefficients → shrinkage), in a **statistical subspace** (signal in
 the leading principal components → PCA truncation), or in the **spatial domain** (local averaging). The
-processor offers a menu; the profile selects the method validated for the active sensor and defaults
-the stage to disabled where not validated (REQ-F-ENH-03).
+processor offers a menu; the profile selects the method validated for the active sensor and may disable
+this denoise sub-step where not validated — the enhancement stage still runs because MTF compensation
+(<5.5>) is mandatory (REQ-F-ENH-03).
 
 **Governing equations.**
 
@@ -435,8 +445,9 @@ reference ADF.
 scaling; $k$ (PCA); $N$ (moving average); $\sigma$/kernel (Gaussian). All per-band-overridable.
 
 **Assumptions & limitations.** (i) Denoising trades resolution/radiometry for noise reduction; its
-radiometric impact is quantified by QA metrics (REQ-F-ENH-03, <5.10>). (ii) Default **off** unless
-validated for the active sensor. (iii) The heritage moving-average implementation reduces a row block
+radiometric impact is quantified by QA metrics (REQ-F-ENH-03, <5.10>). (ii) This denoise sub-step is
+**sensor-profile-configurable** (enabled/disabled per sensor); the enhancement stage itself is mandatory
+because MTF compensation (<5.5>) always runs. (iii) The heritage moving-average implementation reduces a row block
 to a scalar mean; `msi-processor` adopts the canonical $(2N+1)$ sliding mean above. (iv) Global
 frequency filters can introduce ringing near strong edges (Gibbs) — mitigated by padding (`npad`).
 
@@ -444,43 +455,89 @@ frequency filters can introduce ringing near strong edges (Gibbs) — mitigated 
 
 ---
 
-### <5.5> Image-quality enhancement — sharpening / deconvolution
+### <5.5> Image-quality enhancement — MTF compensation (MTFC) via PSF deconvolution
 
-**Purpose.** Restore spatial resolution lost to the instrument point-spread function (PSF) and
-along-chain blurring, per band, optional and profile-selected. (Heritage: `level_1.py`
+> **Change note (CR):** this sub-step is **MTF Compensation (MTFC)** — a **mandatory**, critical
+> Level-1 image-quality restoration step (formerly framed as optional "sharpening"). It materially
+> affects radiometric and spatial product quality and therefore **always runs**.
+
+**Purpose.** Recover the high-spatial-frequency scene content attenuated by the end-to-end instrument
+**Modulation Transfer Function (MTF)** — optics, detector footprint/sampling and platform-motion smear —
+by deconvolving the system **point-spread function (PSF)**, per band. This is a **mandatory** Level-1
+restoration step (not optional): the as-acquired image is MTF-degraded, so MTFC is required to meet the
+spatial-resolution and radiometric-fidelity specification of the L1 product. (Heritage: `level_1.py`
 `sharpening.deconvolution_kernel`; product naming indicates **Wiener deconvolution**.)
 
-**Theoretical background.** The acquired image is a convolution of the true scene $f$ with the system
-PSF $h$ plus noise: $g=h*f+n$. Restoration estimates $f$ by (approximate) inversion of $h$. Naive
-inverse filtering $\hat F=G/H$ amplifies noise where $H\!\to\!0$; the **Wiener** filter regularises by
-the noise-to-signal ratio $K$:
+**Theoretical background.** A linear shift-invariant (LSI) imaging chain forms the acquired image as the
+convolution of the true at-aperture scene $f$ with the system PSF $h$ plus noise $n$:
 
 $$
-\hat F(u,v)=\dfrac{H^{*}(u,v)}{|H(u,v)|^2+K}\,G(u,v),\qquad K=\frac{S_n}{S_f}.
+g = h * f + n,\qquad \text{equivalently}\qquad G(u,v)=H(u,v)\,F(u,v)+N(u,v),
 $$
+
+where $H=\mathcal F\{h\}$ is the **optical/system transfer function (OTF)** and the **MTF** is its
+modulus, $\mathrm{MTF}(u,v)=|H(u,v)|$. The system MTF factorises into the component MTFs,
+
+$$
+\mathrm{MTF}_{\mathrm{sys}}=\mathrm{MTF}_{\mathrm{opt}}\cdot\mathrm{MTF}_{\mathrm{det}}\cdot\mathrm{MTF}_{\mathrm{smear}}\cdot\ldots,
+$$
+
+(diffraction-limited optics, detector spatial integration $\operatorname{sinc}$, and along-track motion
+smear being the dominant terms for a pushbroom MSI). Because $\mathrm{MTF}<1$ at non-zero frequency, the
+instrument attenuates fine detail; **MTFC restores** it by an (approximate, regularised) inversion of
+$h$. Naive inverse filtering $\hat F=G/H$ amplifies noise wherever $H\!\to\!0$, so a regularised
+restoration is mandatory.
 
 **Governing algorithm.**
 
-- **`ALG-ENH-DECONV` (kernel restoration).** A pre-computed, profile-bound spatial kernel $k$ — derived
-  offline from the sensor PSF and the Wiener relation above — is applied by convolution,
+- **`ALG-ENH-DECONV` (MTF compensation / PSF deconvolution).** The mandatory restoration. The reference
+  (heritage) realisation applies a pre-computed, profile-bound spatial **deconvolution kernel** $k$ —
+  derived offline from the sensor PSF/MTF so that $k\approx\mathcal F^{-1}\{1/H\}$ regularised — by
+  convolution,
 
 $$
-\hat I = I * k,
+\hat I = I * k\qquad(\text{heritage: } \texttt{cv2.filter2D}),
 $$
 
-  (heritage: `cv2.filter2D`), with a separate, broader kernel for the higher-resolution
-  (panchromatic) band. The result is clipped to $[0,2^{N_{\mathrm{bit}}}-1]$.
+  with a separate, broader kernel for the higher-resolution (panchromatic) band; the result is clipped
+  to $[0,2^{N_{\mathrm{bit}}}-1]$. The kernel is the spatial-domain image of one of the following
+  candidate restoration filters (down-selected per sensor in the DPM, RD-6):
 
-**Inputs.** Corrected/denoised band(s); profile: per-band sharpening kernel $k$ (PSF-derived) or, in a
-full-deconvolution mode, the PSF $h$ and NSR $K$.
+  - **Wiener (parametric) deconvolution** — regularises by the noise-to-signal ratio $K=S_n/S_f$:
 
-**Parameters.** Per-band kernel/PSF, regularisation $K$, panchromatic-band kernel.
+$$
+\hat F(u,v)=\dfrac{H^{*}(u,v)}{|H(u,v)|^2+K}\,G(u,v),\qquad \hat I=\Re\{\mathcal F^{-1}\{\hat F\}\}.
+$$
+
+  - **Constrained inverse / Tikhonov MTF compensation** — a regularised inverse boosted only up to a
+    frequency/gain cap, $\hat F = \big(H^{*}/(|H|^2+\gamma|C|^2)\big)\,G$ with smoothness operator $C$
+    and weight $\gamma$, to avoid noise blow-up where the MTF is small.
+  - **Richardson–Lucy deconvolution** — iterative, non-negativity-preserving maximum-likelihood
+    restoration for a Poisson noise model:
+
+$$
+f^{(t+1)}=f^{(t)}\cdot\left[h^{\!*}*\dfrac{g}{h*f^{(t)}}\right],
+$$
+
+    with $h^{\!*}$ the flipped PSF; the iteration count trades restoration sharpness against noise
+    amplification.
+
+**Inputs.** Corrected/denoised band(s); **ADF**: per-band **PSF / MTF** characterisation — the
+PSF-derived deconvolution kernel $k$, or, in full-deconvolution mode, the PSF $h$ / sampled MTF and the
+noise-to-signal ratio $K$; profile binding of kernel/PSF and of the higher-resolution (panchromatic)
+band.
+
+**Parameters.** Per-band PSF/MTF and derived kernel; regularisation / NSR $K$ (Wiener) or Tikhonov
+weight $\gamma$; iteration count (Richardson–Lucy); panchromatic-band kernel; restoration-gain /
+frequency cap (anti noise-boost).
 
 **Assumptions & limitations.** (i) Spatially invariant PSF over the band/tile (LSI assumption);
-field-dependent PSF is an open point. (ii) The PSF/kernel is sensor-specific and supplied by the
-profile (heritage kernels are NDA placeholders, not carried over). (iii) Over-sharpening amplifies
-noise and can bias radiometry; impact reported via QA metrics and the stage defaults off unless
-validated.
+field-dependent (across-swath) PSF variation is an open point (tile-wise kernels candidate). (ii) The
+PSF/MTF and kernel are sensor-specific and supplied by the profile/ADF (heritage kernels are NDA
+placeholders, not carried over). (iii) MTFC is **mandatory** but **bounded**: the restoration gain is
+capped and its radiometric/noise impact is quantified by QA metrics (<5.10>) and held within the
+`RAD_ACC` budget, since over-restoration amplifies noise and can bias radiometry. (iv) The denoise
+sub-step (<5.4>) is normally ordered with MTFC so the restoration does not amplify residual noise.
 
 *Trace:* REQ-F-ENH-02, REQ-F-ENH-03, SYS-CAP-02.
 

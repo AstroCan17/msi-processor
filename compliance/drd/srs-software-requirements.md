@@ -123,7 +123,7 @@ prior-work heritage RD-10) are:
 | Level transition | Stage(s) | Functional reqs |
 |---|---|---|
 | `L0c` → `L1A` | Source-packet decode/reformat; lost-packet & line-loss handling; detector/focal-plane assembly; geo-annotation from telemetry | REQ-F-L0-* |
-| `L1A` → `L1B` | Radiometric: dark/offset (DSNU) subtraction, NUC/flat-field (PRNU), BPR; image-quality enhancement (denoise/sharpen); DN→TOA radiance (and optional TOA reflectance) | REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-* |
+| `L1A` → `L1B` | Radiometric: dark/offset (DSNU) subtraction, NUC/flat-field (PRNU), BPR; mandatory image-quality enhancement (configurable denoise + mandatory MTF compensation / PSF deconvolution); DN→TOA radiance (and optional TOA reflectance) | REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-* |
 | `L1B` → `L1C` | Geometric: inter-band co-registration; viewing-model + DEM/GCP orthorectification; resampling to the profile CRS/grid; optional pan-sharpening | REQ-F-COR-*, REQ-F-GEO-*, REQ-F-PAN-* |
 | `L1C` → `L2A` | Atmospheric: AOT/water-vapour ingest/retrieval, TOA→BOA surface reflectance, scene classification, cloud/cloud-shadow masking | REQ-F-ATM-* |
 | all levels | QA metrics & per-pixel quality flags; product generation; chain orchestration; provenance | REQ-F-QA-*, REQ-F-PRD-*, REQ-F-ORC-* |
@@ -190,8 +190,10 @@ The following items limit the developer's options (background and justification 
 - **d.** Functional requirements (<5.2>) are grouped by subject (processing stage), and each stage
   is described as **General / Inputs / Outputs / Processing** before its requirements are listed.
 - **e.** Requirements may be characterised by priority. Unless flagged *(optional)*, a requirement
-  is **essential** and stable. *(optional)* requirements are profile-toggleable enhancement stages
-  not required for a valid baseline `L2A` product.
+  is **essential** and stable. *(optional)* requirements are profile-toggleable stages (e.g.
+  pan-sharpening <5.2.7>, TOA reflectance) not required for a valid baseline `L2A` product. The
+  enhancement stage (REQ-F-ENH-*) is **not** optional: it is **mandatory** because it carries the
+  MTF-compensation (PSF-deconvolution) Level-1 image-quality restoration step.
 
 > **Per-profile numeric budgets.** Performance figures that depend on instrument calibration —
 > radiometric accuracy `RAD_ACC`, geolocation `GEO_CE90`, inter-band co-registration `BAND_COREG`,
@@ -291,26 +293,43 @@ Functional requirements implement SSS capabilities `SYS-CAP-*` and the staged in
   instrument geometry) carrying per-pixel QA flags and processing provenance.
   *Trace:* SYS-CAP-08, REQ-IF-OUT-02. *Verify:* T, I.
 
-#### <5.2.4> Image-quality enhancement — denoise and sharpen
+#### <5.2.4> Image-quality enhancement — denoise and MTF compensation (PSF deconvolution)
 
-- **General.** Optionally improve image quality by noise suppression and resolution restoration,
-  without compromising radiometric integrity. (Heritage: `level_1.py` `Denoiser` — butterworth LP,
-  wavelet VisuShrink, PCA, moving-average, gaussian, FFT dark-noise removal — and `sharpening.deconvolution_kernel`.)
-- **Inputs.** Radiometrically corrected band(s); profile: filter selection and parameters
-  (cutoff, order, kernel), per-band overrides.
-- **Outputs.** Enhanced band(s), values clipped to valid range; QA metrics on noise/sharpness change.
-- **Processing.** Selected denoising filter; deconvolution/sharpening kernel convolution.
+- **General.** Restore Level-1 image quality by **mandatory MTF compensation (MTFC) via PSF
+  deconvolution** — recovering the high-spatial-frequency content attenuated by the instrument MTF
+  (optics + detector + platform motion) — together with noise suppression, without compromising
+  radiometric integrity. This stage is **mandatory and always runs**, because MTFC is a critical
+  Level-1 restoration step that materially affects radiometric/spatial product quality. (Heritage:
+  `level_1.py` `Denoiser` — butterworth LP, wavelet VisuShrink, PCA, moving-average, gaussian, FFT
+  dark-noise removal — and `sharpening.deconvolution_kernel`, used as the PSF-deconvolution kernel.)
 
-- **REQ-F-ENH-01** *(optional)* — The software shall provide configurable per-band denoising with a
+  > **Change note (CR):** enhancement promoted to **mandatory** (post-CDR baseline change); the
+  > "sharpening" sub-step is **MTF compensation (MTFC) via PSF deconvolution**. Denoise remains a
+  > sensor-profile-configurable sub-step; the stage always runs because MTFC is mandatory.
+  > Pan-sharpening (<5.2.7>) is unaffected and stays optional.
+- **Inputs.** Radiometrically corrected band(s); ADFs/profile: per-band instrument PSF/MTF model
+  (deconvolution kernel) for MTFC; denoise method selection and parameters (cutoff, order, kernel),
+  per-band overrides.
+- **Outputs.** Enhanced band(s) with restored high-spatial-frequency content, values clipped to the
+  valid range; QA metrics on noise and MTF/sharpness change.
+- **Processing.** Configurable denoising filter; mandatory MTF compensation by PSF-deconvolution
+  kernel convolution restoring instrument-MTF-attenuated spatial frequencies.
+
+- **REQ-F-ENH-01** — The software shall provide configurable per-band denoising with a
   profile-selected method (at least: Butterworth low-pass, wavelet VisuShrink, PCA, moving-average,
-  Gaussian, FFT dark-noise removal) and parameters.
+  Gaussian, FFT dark-noise removal) and parameters; denoising is a sensor-profile-configurable
+  sub-step of the (mandatory) enhancement stage.
   *Trace:* SYS-CAP-02, SYS-ADP-01. *Verify:* T, A.
-- **REQ-F-ENH-02** *(optional)* — The software shall provide image restoration / sharpening via a
-  profile-selected deconvolution kernel, per band, clipping the result to the valid dynamic range.
-  *Trace:* SYS-CAP-02, SYS-ADP-01. *Verify:* T, A.
-- **REQ-F-ENH-03** — Enhancement stages shall be individually toggleable per profile and shall
-  default to disabled where not validated for the active sensor; when enabled, their radiometric
-  impact shall be reported via QA metrics (REQ-F-QA-01).
+- **REQ-F-ENH-02** — The software shall perform **MTF compensation (MTFC) by PSF deconvolution**,
+  per band, restoring the high-spatial-frequency content attenuated by the instrument MTF (optics +
+  detector + platform motion) using the per-band instrument PSF/MTF model, and clipping the result
+  to the valid dynamic range. This is a **mandatory** Level-1 image-quality restoration step that
+  materially affects radiometric and spatial product quality.
+  *Trace:* SYS-CAP-02, SYS-ADP-01, SYS-QUA-04. *Verify:* T, A.
+- **REQ-F-ENH-03** — The enhancement stage shall be **mandatory and shall always run**, because MTF
+  compensation (REQ-F-ENH-02) is mandatory; the denoising sub-step (REQ-F-ENH-01) may be configured
+  per profile. The radiometric and MTF/spatial impact of the stage shall be reported via QA metrics
+  (REQ-F-QA-01).
   *Trace:* SYS-ADP-01, SYS-QUA-04. *Verify:* T, R.
 
 #### <5.2.5> Inter-band co-registration (`L1B` →)
@@ -749,8 +768,8 @@ T/A/I/R.)*
 | REQ-F-RAD-05 | T, A | Derive gain/offset from dark+flat fixtures; compare to reference (local) |
 | REQ-F-TOA-01, -02 | T, A | DN→radiance(/reflectance) vs DPM closed-form on fixtures |
 | REQ-F-TOA-03 | T, I | `L1B` EOProduct emitted with QA + provenance |
-| REQ-F-ENH-01, -02 | T, A | Filter/kernel unit tests; metric-impact analysis on real data (local) |
-| REQ-F-ENH-03 | T, R | Toggle test; review default-off policy per profile |
+| REQ-F-ENH-01, -02 | T, A | Denoise-filter + MTFC/PSF-deconvolution unit tests; MTF-restoration & radiometric-impact analysis on real data (local) |
+| REQ-F-ENH-03 | T, R | Assert enhancement stage always runs (MTFC mandatory); denoise-configuration test; review per-profile configuration |
 | REQ-F-COR-01, -03 | T, A | Co-register synthetic-shifted bands; failure-path test |
 | REQ-F-COR-02 | A, T | Residual vs `BAND_COREG` on real data (local) |
 | REQ-F-GEO-01, -02 | T, A | Geolocation/ortho on local scene with DEM/GCP |
@@ -898,7 +917,7 @@ a thin CPM adapter over a pure, testable algorithmic core (REQ-D-03).
 flowchart LR
   L0[L0c raw] --> A[L0 decode + ingest\nREQ-F-L0-*]
   A --> B[Radiometric: dark/NUC/BPR\nREQ-F-RAD-*]
-  B --> E[Enhance: denoise/sharpen\nREQ-F-ENH-* opt]
+  B --> E[Enhance: denoise + MTFC/PSF-deconv\nREQ-F-ENH-* mandatory]
   E --> T[TOA radiance/reflectance\nREQ-F-TOA-*]
   T -->|L1B| C[Band co-registration\nREQ-F-COR-*]
   C --> G[Georef + ortho\nREQ-F-GEO-*]
@@ -911,8 +930,8 @@ flowchart LR
 ```
 
 - **`L0c` → `L1A`** (REQ-F-L0-*): decode/reformat, loss handling, assembly, validation.
-- **`L1A` → `L1B`** (REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-*): dark/NUC/BPR, optional
-  denoise/sharpen, DN→TOA radiance/reflectance.
+- **`L1A` → `L1B`** (REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-*): dark/NUC/BPR, mandatory enhancement
+  (configurable denoise + mandatory MTFC/PSF deconvolution), DN→TOA radiance/reflectance.
 - **`L1B` → `L1C`** (REQ-F-COR-*, REQ-F-GEO-*, REQ-F-PAN-*): co-registration, georef/ortho to the
   profile CRS/grid, optional pan-sharpening.
 - **`L1C` → `L2A`** (REQ-F-ATM-*): TOA→BOA, scene classification, cloud/shadow masks.
