@@ -287,6 +287,9 @@ deliver-package:
 
 deliver-image:
   stage: deliver
+  # kaniko needs a container runtime; the Studio shell runner has none, so this
+  # is non-blocking until the SDE Kubernetes runner lands. Mirrors eo-data-embedding.
+  allow_failure: true
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
