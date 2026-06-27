@@ -298,18 +298,21 @@ interface is fixed at CDR so the chain proceeds regardless of the engine choice.
 ### <5.7> DEC-07 — One PU per stage with optional stages toggleable vs fused mega-stages
 
 **Context / drivers.** The chain must support level breakpoints, re-runnable sub-chains and independent
-verification, with some stages optional. Drivers: REQ-F-ORC-01 (run a level / sub-chain / full chain),
-REQ-REL-02 (re-run at breakpoint granularity), REQ-M-04 (modularity), REQ-F-ENH-03 (enhancement default-off
-where unvalidated), `DPM-BKP-*` (level breakpoints).
+verification, with one stage (pan-sharpen) optional and per-stage sub-steps profile-configurable. Drivers:
+REQ-F-ORC-01 (run a level / sub-chain / full chain), REQ-REL-02 (re-run at breakpoint granularity),
+REQ-M-04 (modularity), REQ-F-ENH-03 (enhancement stage always runs; denoise method profile-selectable),
+`DPM-BKP-*` (level breakpoints).
 
 | Option | Pros | Cons |
 |---|---|---|
-| **One PU per processing stage, optional stages toggleable (chosen)** | Level breakpoints `L1A/B/C/L2A`; independent per-stage verification and re-run; optional stages (enhancement, pansharpen) default-off (REQ-F-ENH-03); clean requirement allocation | More inter-PU `EOProduct` hand-offs |
-| Fused mega-stages (e.g. one L0→L1C unit) | Fewer hand-offs; less I/O | No intermediate breakpoints; can't verify or re-run a single correction; poor allocation/traceability; optional stages can't be cleanly toggled |
+| **One PU per processing stage, optional stage toggleable (chosen)** | Level breakpoints `L1A/B/C/L2A`; independent per-stage verification and re-run; the one optional stage (pan-sharpen) is default-off while the mandatory enhancement stage always runs with its denoise method profile-selectable (REQ-F-ENH-03); clean requirement allocation | More inter-PU `EOProduct` hand-offs |
+| Fused mega-stages (e.g. one L0→L1C unit) | Fewer hand-offs; less I/O | No intermediate breakpoints; can't verify or re-run a single correction; poor allocation/traceability; the optional stage can't be cleanly toggled and per-stage sub-steps can't be cleanly configured |
 
 **Decision & rationale.** One PU per stage. Granularity is what makes the chain verifiable, re-runnable
-(REQ-REL-02, REQ-F-ORC-01) and cleanly traceable (one stage → one DPM module → its `REQ-F-*`), and it is
-the only clean way to keep unvalidated optional stages default-off (REQ-F-ENH-03).
+(REQ-REL-02, REQ-F-ORC-01) and cleanly traceable (one stage → one DPM module → its `REQ-F-*`); it is the
+only clean way to keep the optional pan-sharpen stage default-off until validated, and to let a mandatory
+stage's sub-steps be profile-selectable (e.g. the enhancement stage always runs MTF compensation / PSF
+deconvolution while its denoise method is profile-selectable, REQ-F-ENH-03).
 
 **Consequences / cost accepted.** More inter-PU hand-offs; mitigated by lazy Zarr I/O (DEC-09) so hand-offs
 are cheap. Accepted.
@@ -620,7 +623,7 @@ deferred decision with its resolution criterion and owning component.
 | DEC-D2 | **L0 bit-codec body** (packet/CRC/corruption handling beyond the zero-line rule) | `decode`/`detect_and_truncate_loss` signatures, QA semantics | Implemented against the NDA-bound sensor spec; private, profile-bound | C-PU-L0 | REQ-F-L0-*, ATBD <5.1> |
 | DEC-D3 | **Geolocation kernel** (rigorous collinearity model internals; GCP/DEM resampling tunings) | IF-CORE-01, DPM-M-GEO/ALG-GEO-* | Implemented + tuned against GCP residual budget (CE90) | C-PU-GEO | REQ-F-GEO-*, R-09 |
 | DEC-D4 | **Coregistration matcher/filter tunings** (SIFT/FLANN/RANSAC thresholds) | IF-CORE-01, acceptance check (match count/residual) | Tuned against the band-coregistration accuracy budget; profile-fixed seeds | C-PU-COR | REQ-F-COR-*, R-03 |
-| DEC-D5 | **Optional-stage validation status** (enhancement, pansharpen default-off until validated) | Stages present, toggleable, default-off | Enabled per profile only after the stage is validated (SValP) | C-PU-ENH, C-PU-PAN | REQ-F-ENH-03 |
+| DEC-D5 | **Pan-sharpen optional-stage validation status** (pan-sharpen default-off until validated); **enhancement denoise method/tuning** (MTF compensation / PSF deconvolution mandatory and always run; denoise method profile-selectable) | Pan-sharpen present, toggleable, default-off; enhancement stage present and mandatory (MTFC always runs) | Pan-sharpen enabled per profile only after the stage is validated (SValP); enhancement denoise method/parameters selected per sensor profile | C-PU-PAN, C-PU-ENH | REQ-F-ENH-03 |
 | DEC-D6 | **CPM computing-model JSON exact keys** (`[TBC@CDR]` against 2.8.1) | The model contract (inputs/adfs/outputs/params/modes) | Confirmed against the pinned `eopf==2.8.1` schema at CDR finalisation | all C-PU-* | REQ-I-07, DEC-02 |
 
 These are recorded so the CDR can confirm that nothing *architectural* is deferred — only bodies and
