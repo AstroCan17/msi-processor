@@ -360,10 +360,6 @@ sphinx-build:
   # This job builds a single version of the documentation
   # for the current branch.
   stage: documentation generation
-  # the [doc] extra pins (sphinx-needs/test-reports/plantuml) conflict with
-  # eopf[doc]==2.8.1; non-blocking until the doc deps + conf.py + suitr.rst are
-  # cleaned up (mirror eo-data-embedding) in Phase 1.
-  allow_failure: true
   before_script:
     # The documentation generation may require the project's
     # Python dependencies to be installed when 'autodoc' is used.
