@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional
+from collections.abc import Mapping
+from typing import Any, Optional, cast
 
 from eopf.computing.abstract import ADF, DataType, EOProcessingUnit
 from eopf.product import EOGroup, EOProduct
@@ -30,10 +31,11 @@ class MyProcessingUnit(EOProcessingUnit):
 
     def run(
         self,
-        inputs: dict[str, DataType],
-        adfs: Optional[dict[str, ADF]] = None,
+        inputs: Mapping[str, DataType],
+        adfs: Optional[Mapping[str, ADF]] = None,
+        mode: Optional[str] = None,
         **kwargs: Any,
-    ) -> dict[str, DataType]:
+    ) -> Mapping[str, DataType]:
         """Runs the processing unit
 
         A more complete description can be added here.
@@ -85,7 +87,7 @@ class MyProcessingUnit(EOProcessingUnit):
         # Simulate some processing: This is only dummy code.
         for product_key in inputs:
             print("Input product key:", product_key)
-            input_product = inputs[product_key]
+            input_product = cast(EOProduct, inputs[product_key])
             print("Input product:", input_product.name, input_product)
             subgroup = EOGroup(product_key)
             output_product.measurements[input_product.name] = subgroup
