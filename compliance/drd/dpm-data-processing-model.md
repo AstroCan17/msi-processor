@@ -236,7 +236,7 @@ flowchart TD
   MP -->|L1C| MA[DPM-M-ATM TOA→BOA + class + masks]
   MA -->|L2A| W[DPM-M-PRD write Zarr EOProduct + provenance]
   QA[[DPM-M-QA metrics + flag propagation]] -.-> MR & MT & MC & MG & MA & W
-  ADF[(ADF set)] -.-> MR & MT & MG & MA
+  ADF[(ADF set)] -.-> MR & ME & MT & MG & MA
   PROF[(Sensor profile)] -.-> M0 & MR & ME & MT & MC & MG & MP & MA
 ```
 
@@ -276,12 +276,18 @@ acquisition, and read-only (IRD REQ-IF-IN-ADF-01..04; SRS REQ-S-01). Concrete sc
 | `DPM-ADF-FLAT` | Flat-field / PRNU reference (or per-detector gain table) | `DPM-M-RAD` | Non-uniformity correction |
 | `DPM-ADF-NUC` | Derived per-detector gain `g(s)` & offset `o(s)` (calibration product) | `DPM-M-RAD` | NUC application (may be produced by `DPM-M-RAD` calibration mode, REQ-F-RAD-05) |
 | `DPM-ADF-BPM` | Bad/defective-pixel map | `DPM-M-RAD` | Defective-detector flag & replacement |
+| `DPM-ADF-PSF` | Per-band PSF / MTF kernel (focal-plane 2-D kernels, `float32`) | `DPM-M-ENH` | **Mandatory** input to MTF compensation (PSF deconvolution); per-band PSF/MTF kernel for mandatory MTF compensation; unit-DC-gain normalised (sum=1) so radiometry is preserved |
 | `DPM-ADF-RAD` | Absolute radiometric gain `G_b` / offset `O_b` | `DPM-M-TOA` | DN → radiance |
 | `DPM-ADF-SPEC` | Spectral calibration / ESUN `E_b` per band | `DPM-M-TOA` | Radiance → reflectance |
 | `DPM-ADF-GEOM` | Viewing / geometric model (incl. detector pitch, focal length, boresight) | `DPM-M-GEO` | Geolocation / GSD |
 | `DPM-ADF-DEM` | Digital elevation model | `DPM-M-GEO`, `DPM-M-ATM` | Orthorectification; terrain in atmospheric path |
 | `DPM-ADF-GCP` | Ground-control / reference-image set | `DPM-M-GEO` | Geolocation refinement |
 | `DPM-ADF-ATM` | Atmospheric auxiliaries (AOT, water vapour, atmospheric model parameters) | `DPM-M-ATM` | TOA → BOA |
+
+> **Change note (CR-3).** `DPM-ADF-PSF` is added as a **mandatory** ADF for the enhancement stage
+> (`DPM-M-ENH`): the per-band PSF/MTF kernel consumed by the mandatory MTF-compensation sub-step moves
+> from a *parameter* (`DPM-PRM-ENH-05`) to this ADF, because it is per-band calibration data (not a
+> scalar parameter). The optional `DPM-ADF-DARK` (fft-dark only) remains available to `DPM-M-ENH`.
 
 ### <7.3> Intermediate and output products
 
@@ -322,7 +328,7 @@ heritage code (RD-7) and are profile-overridable; instrument-calibration constan
 | `DPM-PRM-ENH-02` | ENH | Butterworth: `cutoff`, `order`, `squared_butterworth`, `npad` | profile | `cutoff=0.2`, `order=10`, `squared=False`, `npad=0` |
 | `DPM-PRM-ENH-03` | ENH | Gaussian: kernel size, σ | profile / derived | `5×5`, σ = image std |
 | `DPM-PRM-ENH-04` | ENH | PCA components; moving-average window `N` | profile | `N=60` (heritage) |
-| `DPM-PRM-ENH-05` | ENH | MTF compensation (MTFC): PSF deconvolution kernel(s) (MS + larger PAN kernel) — **mandatory** | profile | per-band kernel from instrument MTF/PSF characterisation |
+| `DPM-PRM-ENH-05` | ENH | MTF compensation (MTFC): PSF deconvolution kernel(s) (MS + larger PAN kernel) — **mandatory** | ADF (`DPM-ADF-PSF`) | per-band PSF/MTF kernel (calibration data, not a scalar parameter); unit-DC-gain normalised (sum=1) |
 | `DPM-PRM-TOA-01` | TOA | ESUN `E_b` per band | ADF (`DPM-ADF-SPEC`) | private |
 | `DPM-PRM-TOA-02` | TOA | Illumination-geometry source (`θ_s`, `d_es`) | derived (telemetry/TLE) / profile | from acquisition geometry |
 | `DPM-PRM-TOA-03` | TOA | Emit TOA reflectance (on/off) | profile | optional |
@@ -457,12 +463,15 @@ flowchart TD
   sel -- yes --> dn[Apply selected denoiser]
   sel -- no --> mtfc
   dn --> mtfc[MTF compensation: PSF deconvolution — mandatory]
+  psf[(DPM-ADF-PSF)] --> mtfc
   mtfc --> clip[Clip to valid range]
   clip --> qa[QA metric impact vs input]
   qa --> out[/DPM-PR-ENH/]
 ```
 
-**Inputs.** `DPM-PR-NUC` (band(s)). **Parameters.** `DPM-PRM-ENH-01..05`.
+**Inputs.** `DPM-PR-NUC` (band(s)); ADF `DPM-ADF-PSF` (**mandatory** per-band PSF/MTF kernel for the
+MTF-compensation sub-step); optionally `DPM-ADF-DARK` (FFT dark-noise sub-step only).
+**Parameters.** `DPM-PRM-ENH-01..05`.
 
 **Mathematical description.**
 - **Butterworth low-pass** (frequency domain): magnitude
@@ -478,8 +487,9 @@ flowchart TD
   attenuated by the instrument MTF by deconvolving the per-band point-spread function. The heritage
   realisation applies a restoration kernel `out = filter2D(value, kernel)` (the MTFC/PSF-deconvolution
   kernel), with a distinct (larger) kernel for the panchromatic band, then `clip(out, 0, 2¹²−1)`. The
-  kernel set is a profile constant derived from the instrument MTF/PSF characterisation; the rigorous
-  deconvolution formulation is the ATBD basis (RD-3).
+  per-band kernel set is the **mandatory** `DPM-ADF-PSF` ADF (focal-plane 2-D kernels, `float32`,
+  normalised to unit DC gain (sum=1) so radiometry is preserved), referenced by URI and opened
+  read-only; the rigorous deconvolution formulation is the ATBD basis (RD-3).
 
 **Outputs.** `DPM-PR-ENH` (denoised + MTF-compensated band(s), clipped) + QA metric deltas.
 **Exception handling.** The stage is **mandatory** and always runs because MTFC is non-optional; the
