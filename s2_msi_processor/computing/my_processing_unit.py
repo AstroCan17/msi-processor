@@ -31,7 +31,7 @@ class MyProcessingUnit(EOProcessingUnit):
 
     def run(
         self,
-        inputs: Mapping[str, DataType],
+        inputs: Mapping[str, Any],
         adfs: Optional[Mapping[str, ADF]] = None,
         mode: Optional[str] = None,
         **kwargs: Any,
