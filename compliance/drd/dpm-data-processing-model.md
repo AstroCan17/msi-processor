@@ -79,6 +79,9 @@ products are anchored to a stable, traceable algorithm decomposition.
 | RD-10 | `msi-processor` Software System Specification (SSS) — `SYS-*` | `compliance/drd/sss-software-system-specification.md` |
 | RD-11 | `msi-processor` Interface Requirements Document (IRD) — `REQ-IF-*` | `compliance/drd/ird-interface-requirements.md` |
 | RD-12 | Cloud-native data conventions | Zarr v2/v3, CF metadata, STAC |
+| RD-13 | NASA EOSDIS Data Processing Levels (Terminology Spec. 423-SPEC-005) — base taxonomy L0/L1A/L1B/L2 | https://www.earthdata.nasa.gov/engage/open-data-services-and-software/data-information-policy/data-levels |
+| RD-14 | Sentinel-2 MSI Products Specification (PSD) / Level-1C & Level-2A product definitions | https://sentinel.esa.int/web/sentinel/user-guides/sentinel-2-msi/product-types ; SentiWiki S2 Products |
+| RD-15 | CEOS processing-level guidance (revised processing-level scheme) | https://ceos.org (LSI-VC processing levels) |
 
 ---
 
@@ -199,6 +202,16 @@ flowchart LR
 | `L1C → L2A` | `L2A` — BOA surface reflectance + scene classification + cloud/cloud-shadow masks | `DPM-M-ATM` | REQ-F-ATM-* |
 | all levels | QA flags & metrics, Zarr product, provenance, orchestration | `DPM-M-QA`, `DPM-M-PRD` | REQ-F-QA-*, REQ-F-PRD-*, REQ-F-ORC-* |
 
+> **Normative basis (level taxonomy).** The processing-level framework `L0/L1A/L1B/L2` follows the
+> NASA EOSDIS data-processing-level taxonomy (Terminology Spec. 423-SPEC-005, RD-13), aligned with the
+> CEOS convention (RD-15): `L1A` = reconstructed full-resolution samples with calibration appended but
+> **not applied**; `L1B` = processed to (at-sensor) instrument units; `L2` = derived geophysical
+> variables. The `L1C` (orthorectified TOA reflectance on a cartographic grid) and `L2A` (BOA surface
+> reflectance) levels are **not** part of the EOSDIS/CEOS base scheme — they are adopted from the
+> **Sentinel-2 / EOPF MSI convention** (RD-14), which this processor follows for cross-mission
+> alignment. For a non-Sentinel sensor these are conventional labels only (an orthorectified product is
+> elsewhere termed `L1T`); the level definitions in this clause are **normative for `msi-processor`**.
+>
 > **Level vs. module.** `L1B` is reached only after `DPM-M-TOA`; `DPM-M-RAD`/`DPM-M-ENH` outputs are
 > *intra-level* intermediate products usable as optional breakpoints (clause <9>). `L1A`, `L1B`,
 > `L1C`, `L2A` are the **mandatory level products** persisted as Zarr `EOProduct`s.
