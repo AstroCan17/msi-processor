@@ -1,0 +1,26 @@
+{
+  "name": "msi_radiometric",
+  "version": "1.0.0",
+  "level": "L1A",
+  "inputs": [
+    {"name": "l1a", "mandatory": true}
+  ],
+  "adfs": [
+    {"name": "dark", "mandatory": true},
+    {"name": "nuc", "mandatory": false},
+    {"name": "flatfield", "mandatory": false},
+    {"name": "badpixel", "mandatory": false}
+  ],
+  "outputs": [
+    {"name": "rad", "mandatory": true},
+    {"name": "nuc", "mandatory": false}
+  ],
+  "parameters": {
+    "bit_depth": {"type": "integer", "default": 12},
+    "nuc_mode": {"type": "string", "enum": ["read", "derive"], "default": "read"},
+    "g_min": {"type": "number"},
+    "g_max": {"type": "number"},
+    "remove_dark_fft": {"type": "boolean", "default": false}
+  },
+  "modes": ["default", "calibration"]
+}

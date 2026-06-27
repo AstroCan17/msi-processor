@@ -1,0 +1,42 @@
+{
+  "available_modes": ["default", "calibration"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "l1a": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "dark": {"min_occurs": 1, "spec": {"required": true}},
+        "nuc": {"min_occurs": 1, "spec": {"required": true}},
+        "badpixel": {"min_occurs": 0, "spec": {"required": false}}
+      },
+      "outputs": {
+        "rad": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "bit_depth": {"required": false},
+        "g_min": {"required": false},
+        "g_max": {"required": false},
+        "remove_dark_fft": {"required": false}
+      }
+    },
+    "calibration": {
+      "inputs": {
+        "l1a": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "dark": {"min_occurs": 1, "spec": {"required": true}},
+        "flatfield": {"min_occurs": 1, "spec": {"required": true}},
+        "badpixel": {"min_occurs": 0, "spec": {"required": false}}
+      },
+      "outputs": {
+        "rad": {"type": "product", "spec": {}},
+        "nuc": {"min_occurs": 0, "type": "product", "spec": {}}
+      },
+      "parameters": {
+        "bit_depth": {"required": false}
+      }
+    }
+  }
+}
