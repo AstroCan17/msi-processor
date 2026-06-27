@@ -19,7 +19,7 @@
 ## Introduction
 
 This section constitutes the Software release note (SRN) for the
-s2-msi-processor, release XXX.
+msi-processor, release XXX.
 
 ```{note}
 Please fill in the release version.
@@ -28,7 +28,7 @@ Please fill in the release version.
 ## Software release overview
 
 This Software release note contains release information
-for the s2-msi-processor, providing:
+for the msi-processor, providing:
 
 - version of the release,
 - an overview of the contents of the release,

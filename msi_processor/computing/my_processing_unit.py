@@ -61,7 +61,7 @@ class MyProcessingUnit(EOProcessingUnit):
 
           # All required imports
           from eopf.product import EOProduct
-          from s2_msi_processor.computing.my_processing_unit import MyProcessingUnit
+          from msi_processor.computing.my_processing_unit import MyProcessingUnit
 
           # Simple example to demonstrate how to create and run the
           # processing unit.

@@ -21,9 +21,9 @@ from eopf.logging import EOLogging
 
 # You might have to reformat the imports depending on the
 # length of the package name that is given when generating your project.
-from s2_msi_processor.computing.my_processing_unit import MyProcessingUnit
-from s2_msi_processor.exceptions.errors import MyError
-from s2_msi_processor.exceptions.warnings import MyWarning
+from msi_processor.computing.my_processing_unit import MyProcessingUnit
+from msi_processor.exceptions.errors import MyError
+from msi_processor.exceptions.warnings import MyWarning
 
 
 class MyProcessor(EOProcessingUnit):
@@ -64,7 +64,7 @@ class MyProcessor(EOProcessingUnit):
         See https://numpydoc.readthedocs.io/en/latest/example.html
         for numpydoc examples.
 
-        >>> from s2_msi_processor.computing.my_processor import (
+        >>> from msi_processor.computing.my_processor import (
         >>>    MyProcessor,
         >>> )
         >>> myProcessor = MyProcessor()

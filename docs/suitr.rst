@@ -16,7 +16,7 @@ Software unit and integration test report
 =========================================
 
 This page constitutes the Software unit and integration test report
-(SUITR) of the s2-msi-processor project.
+(SUITR) of the msi-processor project.
 
 Reports generated the |today|.
 

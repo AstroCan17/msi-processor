@@ -19,7 +19,7 @@
 ## Introduction
 
 This section constitutes the Interface control document (ICD) for the
-s2-msi-processor project.
+msi-processor project.
 
 It defines the public interfaces of the software.
 
