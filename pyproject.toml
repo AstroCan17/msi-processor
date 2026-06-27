@@ -51,14 +51,7 @@ security = ["eopf[security] >= 1.5.0"]
 notebook = ["eopf[notebook] >= 1.5.0"]
 doc = [
     "eopf[doc] >= 1.5.0",
-    # Align the versions with the ones from the 'python-build-environment' project.
-    "sphinxcontrib-mermaid == 0.8.1",
-    # Dependency required to be present for sphinx-test-reports to work,
-    # even though never used. The extension will actually not work as it
-    # requires PlantUML to be installed, which is a Java library.
-    "sphinxcontrib-plantuml == 0.25",
-    "sphinxcontrib-spelling == 8.0.0",
-    "sphinx-test-reports == 1.0.2",
+    "sphinxcontrib-mermaid",
 ]
 complexity = ["eopf[complexity] >= 1.5.0"]
 doc-cov = ["eopf[doc-cov] >= 1.5.0"]
