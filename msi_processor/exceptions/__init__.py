@@ -12,6 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Exception and warning vocabulary of ``msi-processor``.
+
+The typed :class:`~msi_processor.exceptions.errors.MsiProcessorError`
+hierarchy (SDD <5.4.1>) is re-exported here for convenient import.
 """
-This module is an example for managing exceptions of the package.
-"""
+
+from msi_processor.exceptions.errors import (
+    AdfResolutionError,
+    AtmosphericError,
+    CoregistrationError,
+    GeolocationError,
+    InputValidationError,
+    MsiProcessorError,
+    MyError,
+    ProductWriteError,
+    ProfileValidationError,
+    RadiometricError,
+)
+from msi_processor.exceptions.warnings import MyWarning
+
+__all__ = [
+    "MsiProcessorError",
+    "InputValidationError",
+    "ProfileValidationError",
+    "AdfResolutionError",
+    "RadiometricError",
+    "CoregistrationError",
+    "GeolocationError",
+    "AtmosphericError",
+    "ProductWriteError",
+    "MyError",
+    "MyWarning",
+]
