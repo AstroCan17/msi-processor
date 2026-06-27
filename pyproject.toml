@@ -36,8 +36,14 @@ requires-python = ">=3.11"
 # EOPF CPM is pinned to a fixed version for a stable build environment,
 # matching the version available in the SDE cpm-build-environment image
 # (same pin as the eopf-ml/eo-data-embedding project on this SDE).
+#
+# OpenCV is a genuine runtime dependency of the coregistration / pan-sharpening
+# stages (SIFT / FLANN / RANSAC / warpPerspective; ATBD <5.6>, SDD <5.4.6>).
+# The headless wheel is used as the target and CI runtimes have no display; it
+# ships PEP 561 type stubs, so mypy resolves ``cv2`` natively.
 dependencies = [
     "eopf == 2.8.1",
+    "opencv-python-headless >= 4.8",
 ]
 license = {file = "LICENSE"}
 
