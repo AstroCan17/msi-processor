@@ -229,7 +229,7 @@ class EnhancementUnit(EOProcessingUnit):
                 stage="enhancement",
             )
         return EnhancementParams(
-            denoise_method=method,
+            denoise_method=cast(DenoiseMethod, method),
             denoise_params=dict(kwargs.get("denoise_params", {})),
             bit_depth=int(kwargs.get("bit_depth", 12)),
             fill_value=kwargs.get("fill_value"),
