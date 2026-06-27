@@ -1,0 +1,22 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "enh": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "radiometric": {"min_occurs": 1, "spec": {"required": true}},
+        "spectral": {"min_occurs": 0, "spec": {"required": false}}
+      },
+      "outputs": {
+        "l1b": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "emit_reflectance": {"required": false},
+        "fill_value": {"required": false}
+      }
+    }
+  }
+}
