@@ -193,8 +193,9 @@ SDD <5.2>d).
   no write path to the L0 location shall exist. *Trace:* REQ-IF-IN-L0-03, REQ-F-L0-05. *Verify:* A, I.
 - **ICD-IF-ADF-01** — Each calibration input shall be supplied as a CPM `AuxiliaryDataFile`
   (`name`, `path` URI, `store_params`) with the content of <5.3.2>; gain/offset, dark and flat-field
-  are mandatory, the rest profile-selected. *Trace:* REQ-IF-IN-ADF-01, REQ-F-RAD-01/02, REQ-F-TOA-01.
-  *Verify:* I, T.
+  are mandatory, the PSF/MTF kernel (`psf`, `DPM-ADF-PSF`) is mandatory to the enhancement unit
+  (C-PU-ENH), and the rest are profile-selected. *Trace:* REQ-IF-IN-ADF-01, REQ-F-RAD-01/02,
+  REQ-F-TOA-01, REQ-F-ENH-02. *Verify:* I, T.
 - **ICD-IF-ADF-02** — Each ADF shall carry id, version and validity (sensor/profile, time range) in
   the attributes of <5.3.2> table B so the correct ADF is selectable for a given `L0c`.
   *Trace:* REQ-IF-IN-ADF-02, REQ-S-04. *Verify:* I, T.
@@ -330,11 +331,21 @@ choice is a per-profile/heritage detail (`[TBC@impl]` only for the legacy contai
 | `dem` | profile | digital elevation model | int16/float32 · `(y, x)` | REQ-F-GEO-02 |
 | `gcp` | profile | ground-control / reference points | table | REQ-F-GEO-02 |
 | `atmospheric` | profile | AOT, water vapour, atmos-model params / RT-LUT | float32 · grid/scalar/LUT | REQ-F-ATM-01/02 |
+| `psf` | yes (ENH) | per-band PSF/MTF kernel (focal-plane geometry), normalised to unit DC gain (Σ=1) | float32 · 2-D `(band, ky, kx)` | REQ-F-ENH-02: MTF compensation (PSF deconvolution), C-PU-ENH |
 
 - **NUC derivation (heritage RD-10, REQ-F-RAD-05), informative:** column-mean dark/flat →
   `gain = (mean(flat) − mean(dark)) / (flat − dark)`, `offset = mean(flat) − gain·flat`; detectors with
   out-of-range gain are flagged into `badpixel`. The algorithm basis is the DPM (RD-6) / ATBD (RD-7)
   (`ALG-RAD-NUC`); the SDD core is `radiometric.core.estimate_nuc` (SDD <5.4.3>).
+
+- **PSF/MTF kernel (`psf`, DPM `DPM-ADF-PSF`), mandatory to the enhancement unit:** per-band 2-D kernels
+  in focal-plane geometry, float32, **normalised to unit DC gain (Σ=1)** so radiometry is preserved;
+  consumed by the **mandatory** MTF-compensation (PSF-deconvolution) sub-step of the enhancement stage
+  (C-PU-ENH / `ALG-ENH-DECONV`, REQ-F-ENH-02). The kernel is per-band private calibration data referenced
+  by ADF URI only (values not reproduced here) and opened read-only (`ICD-IF-ADF-03/04`).
+- **Change note (CR-3):** the PSF/MTF kernel is declared here as the `psf` calibration ADF (`DPM-ADF-PSF`),
+  having moved from an enhancement parameter to per-band calibration data; the optional `dark` ADF
+  (fft_dark only) is retained.
 
 **B. ADF identification & validity attributes** (every ADF; legality-checked on selection by
 `C-COM-ADF.check_validity`, SDD <5.4.11>):
@@ -599,9 +610,9 @@ JSON-Schema controlled; invalid/incomplete ⇒ `ProfileValidationError` with dia
 | `modes[]` | list[str] | supported instrument modes | non-empty |
 | `bands[]` | list[obj] | `{name, centre_wavelength_nm, srf_ref, esun, line_factor}` | ≥1; names unique |
 | `focal_plane` | obj | `{n_detectors, samples_per_line, bit_depth}` | bit_depth>0 |
-| `adf_bindings` | obj | default ADF ids per type (`radiometric,dark,flatfield,badpixel,spectral,viewing_model,dem,gcp,atmospheric`) | mandatory types bound |
+| `adf_bindings` | obj | default ADF ids per type (`radiometric,dark,flatfield,badpixel,spectral,viewing_model,dem,gcp,atmospheric,psf`) | mandatory types bound |
 | `radiometric` | obj | dark/NUC thresholds (`g_min,g_max`), saturation/no-data values, `remove_dark_fft` | — |
-| `enhancement` | obj | `{denoise:{method,params}, sharpen:{kernel}, enabled:bool}` | method ∈ allowed set |
+| `enhancement` | obj | `{denoise:{method,params}, sharpen:{}, enabled:bool}` (PSF/MTF kernel via the `psf` ADF, not a parameter — CR-3) | method ∈ allowed set |
 | `coregistration` | obj | `{reference_band, matcher_params, thresholds, seed}` | reference_band ∈ bands |
 | `geometry` | obj | `{crs, grid, resolution, resampling, use_gcp}` | valid CRS |
 | `pansharpen` | obj | `{enabled, method, pan_band}` | if enabled, pan_band set |
@@ -658,7 +669,7 @@ CI and are validated locally (REQ-PORT-03). The detailed interface→test-case t
 | ICD-IF-L0-01 | I, T | Decode a sample `L0c` (local); assert `L1A` DataTree vs <5.3.1>A |
 | ICD-IF-L0-02 | I, T | Inspect selection metadata; resolve profile/ADF from a sample `L0c` |
 | ICD-IF-L0-03 | A, I | Static analysis / inspection: no write path to L0 (`OpeningMode.OPEN`) |
-| ICD-IF-ADF-01 | I, T | Load gain/offset, dark, flat-field as `AuxiliaryDataFile`; assert content vs <5.3.2>A (local) |
+| ICD-IF-ADF-01 | I, T | Load gain/offset, dark, flat-field, `psf` as `AuxiliaryDataFile`; assert content (incl. `psf` unit-DC-gain Σ=1) vs <5.3.2>A (local) |
 | ICD-IF-ADF-02 | I, T | Inspect id/version/validity attrs; select valid ADF for a given `L0c` |
 | ICD-IF-ADF-03 | I, A | Repo/CI scan: no ADF content committed; runtime-URI resolution |
 | ICD-IF-ADF-04 | A, I | Static analysis / inspection: ADFs opened read-only |
@@ -717,7 +728,7 @@ reference).
 | ICD interface | Parent IRD | Parent SRS |
 |---|---|---|
 | ICD-IF-L0-* | REQ-IF-IN-L0-01..03 | REQ-F-L0-01..05, REQ-I-03 |
-| ICD-IF-ADF-* | REQ-IF-IN-ADF-01..04, REQ-IF-SEC-01/02 | REQ-F-RAD-01..05, REQ-F-TOA-01, REQ-F-ATM-01, REQ-DAT-02, REQ-S-04, REQ-M-02 |
+| ICD-IF-ADF-* | REQ-IF-IN-ADF-01..04, REQ-IF-SEC-01/02 | REQ-F-RAD-01..05, REQ-F-TOA-01, REQ-F-ENH-02, REQ-F-ATM-01, REQ-DAT-02, REQ-S-04, REQ-M-02 |
 | ICD-IF-OUT-* | REQ-IF-OUT-01..04, REQ-IF-CAP-03 | REQ-F-PRD-01/02, REQ-F-QA-02, REQ-I-04, REQ-DAT-01, REQ-D-09 |
 | ICD-IF-SW-* | REQ-IF-SW-01..04, REQ-IF-HW-01 | REQ-D-01/03/06, REQ-F-ORC-01, REQ-R-02/03 |
 | ICD-IF-TRIG-* | REQ-IF-COM-01..03, REQ-IF-CAP-01 | REQ-I-05/06, REQ-O-01, REQ-F-ORC-01, REQ-PORT-03 |
