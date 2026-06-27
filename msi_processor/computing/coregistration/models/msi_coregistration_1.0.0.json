@@ -1,0 +1,27 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "l1b": {"type": "product", "spec": {}}
+      },
+      "adfs": {},
+      "outputs": {
+        "cor": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "reference_band": {"required": true},
+        "clahe_clip": {"required": false},
+        "clahe_grid": {"required": false},
+        "match_fraction": {"required": false},
+        "min_keypoints": {"required": false},
+        "min_keypoints_pan": {"required": false},
+        "pan_bands": {"required": false},
+        "ransac_tau": {"required": false},
+        "max_residual": {"required": false},
+        "seed": {"required": false}
+      }
+    }
+  }
+}
