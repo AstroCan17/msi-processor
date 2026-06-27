@@ -568,8 +568,8 @@ Tier-A check and a numerical Tier-C budget, both tiers are listed.
 | REQ-F-RAD-05 (opt) | T, A | B | Derive gain/offset from real dark+flat; compare to reference (local) |
 | REQ-F-TOA-01, -02 | T, A | A + C | DN→radiance/reflectance closed-form on fixtures; vs reference (local) |
 | REQ-F-TOA-03 | T, I | A | `L1B` EOProduct emitted with QA + provenance |
-| REQ-F-ENH-01, -02 (opt) | T, A | A + C | Filter/kernel unit tests; radiometric-impact analysis on real data |
-| REQ-F-ENH-03 | T, R | A | Toggle test; review default-off-per-profile policy |
+| REQ-F-ENH-01, -02 | T, A | A + C | Filter/kernel unit tests (MTFC/PSF deconvolution + denoise); radiometric-impact analysis on real data |
+| REQ-F-ENH-03 | T, R | A | Confirm enhancement stage always runs (MTFC mandatory, always applied); verify denoise toggle behaves per sensor profile |
 | REQ-F-COR-01, -03 | T, A | A | Co-register synthetic-shifted bands (known homography); failure-path test |
 | REQ-F-COR-02 | A, T | C | Inter-band tie-point RMSE vs `BAND_COREG` (local) |
 | REQ-F-GEO-01, -02 | T, A | A + B | Geolocation/ortho on synthetic grid; on real scene with DEM/GCP (local) |

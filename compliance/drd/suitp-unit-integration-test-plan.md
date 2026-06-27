@@ -140,7 +140,7 @@ interfaces are specified in the SRS (RD-4), SDD (RD-9) and ICD (RD-5) and are **
 
 **Items under test (the SDD components, RD-9 `<5.3>`).** The unit of test is the design component:
 
-- **Pure Cores** (`msi_processor.computing.<stage>.core`) — `C-PU-L0`, `C-PU-RAD`, `C-PU-ENH` *(opt)*,
+- **Pure Cores** (`msi_processor.computing.<stage>.core`) — `C-PU-L0`, `C-PU-RAD`, `C-PU-ENH`,
   `C-PU-TOA`, `C-PU-COR`, `C-PU-GEO`, `C-PU-PAN` *(opt)*, `C-PU-ATM` *(new)*, `C-PU-QA`. CPM-free; the
   primary unit-test targets (numerics).
 - **PU Wrappers** (`…<stage>.unit`, the `EOProcessingUnit` subclasses) — the `run()` adapters; tested in
@@ -346,7 +346,8 @@ applicable documentation (Annex K `<7.3>`a):
 - **L0 decode / loss / legality / assembly** (REQ-F-L0-01..04; DPM-M-L0; ALG-L0-DEC/LOSS; SDD `<5.4.2>`).
 - **Radiometric: dark/DSNU, NUC/PRNU, BPR, saturation/no-data, optional NUC derivation** (REQ-F-RAD-01..05;
   DPM-M-RAD; ALG-RAD-*; SDD `<5.4.3>`).
-- **Enhancement (opt): denoise + sharpen, toggle/default-off** (REQ-F-ENH-01..03; SDD `<5.4.4>`).
+- **Enhancement (mandatory): MTF compensation (MTFC) by PSF deconvolution always runs; profile-configurable
+  denoise sub-step** (REQ-F-ENH-01..03; SDD `<5.4.4>`).
 - **TOA: DN→radiance, optional reflectance, `L1B` emission** (REQ-F-TOA-01..03; SDD `<5.4.5>`).
 - **Co-registration: feature-based alignment, acceptance, fail-stop** (REQ-F-COR-01..03; SDD `<5.4.6>`).
 - **Georeference: geolocation/GSD/GCP/DEM-ortho/resample, `L1C` emission** (REQ-F-GEO-01..04; SDD `<5.4.7>`).
@@ -466,7 +467,7 @@ Each test design is described by the Annex K `<8.2.1>`–`<8.2.4>` aspects:
 |---|---|---|---|---|---|---|
 | **TD-UT-L0** | L0 decode, loss, legality, initial QA | `l0_decode.core`: `decode`*[impl]*, `detect_and_truncate_loss`, `check_legality`, `initial_qa` | REQ-F-L0-01..04; C-PU-L0; DPM-M-L0 / ALG-L0-DEC,LOSS | Unit; constructed (inject known loss → assert truncation+`LOST_PACKET`; malformed → `InputValidationError`); `decode` tested at interface level on a stubbed codec | CI shell runner; POSIX; no I/O | TC-L0-01..05 |
 | **TD-UT-RAD** | Dark/NUC/BPR/saturation + optional NUC derivation | `radiometric.core`: `estimate_nuc`, `apply_nuc`, `detect_bad_pixels`, `replace_bad_pixels`, `flag_saturation`, `remove_dark_fft` | REQ-F-RAD-01..05; C-PU-RAD; DPM-M-RAD / ALG-RAD-* | Unit; **closed-form** (`X=dn·g+o−d`); constructed (inject bad/saturated → `DEFECTIVE`/`SATURATED`, neighbour interp); clip to range | CI; POSIX | TC-RAD-01..07 |
-| **TD-UT-ENH** *(opt)* | Denoise + sharpen, toggle | `enhancement.core`: `denoise` (+kernels), `sharpen` | REQ-F-ENH-01..03; C-PU-ENH; ALG-ENH-* | Unit; constructed (flat/known-signal in→preserved within tol; output clipped); toggle/default-off; bad method → `InputValidationError` at profile validation | CI; POSIX | TC-ENH-01..04 |
+| **TD-UT-ENH** | MTF compensation (mandatory) + configurable denoise | `enhancement.core`: `mtf_compensate` (PSF deconvolution), `denoise` (+kernels) | REQ-F-ENH-01..03; C-PU-ENH; ALG-ENH-* | Unit; **mandatory MTFC always runs** — constructed (flat/known-PSF in→restored within tol; radiometry preserved; output clipped); denoise sub-step **profile-configurable** (method selectable per profile); bad denoise method → `InputValidationError` at profile validation | CI; POSIX | TC-ENH-01..05 |
 | **TD-UT-TOA** | DN→radiance, optional reflectance, geometry | `toa.core`: `dn_to_radiance`, `radiance_to_reflectance`, `earth_sun_distance`, `solar_geometry`*[impl]* | REQ-F-TOA-01..02; C-PU-TOA; ALG-TOA-RAD,REF | Unit; **closed-form** (`L=(DN−o)·g`; `ρ=πLd²/(E cosθ)`, clip[0,1]); assert heritage `radiance−=min` is **not** applied | CI; POSIX | TC-TOA-01..04 |
 | **TD-UT-COR** | Inter-band co-registration, acceptance, fail-stop | `coregistration.core`: `estimate_homography`, `warp_to_reference`, `coregister` | REQ-F-COR-01,03; C-PU-COR; ALG-COR-* | Unit; **constructed** (apply known homography to a band, assert recovery within px tol); insufficient keypoints → `CoregistrationError`+`COREG_FAIL`; fixed `seed` (REQ-F-DEP-02) | CI; POSIX; seeded RNG | TC-COR-01..04 |
 | **TD-UT-GEO** | GSD, orbit, geolocate, GCP refine, resample | `georeference.core`: `compute_gsd`, `orbit_state`*[impl]*, `geolocate`*[impl]*, `refine_with_gcp`, `resample_to_grid` | REQ-F-GEO-01,02,04; C-PU-GEO; ALG-GEO-* | Unit; closed-form (`GSD=alt·pitch/focal`); constructed on a synthetic grid+flat DEM (assert known pixel→ground mapping); resample identity on aligned grid; rigorous body interface-level *[impl]* | CI; POSIX | TC-GEO-01..05 |
@@ -586,10 +587,11 @@ determinism · **EX** exception/fail-stop · **ST** structure.
 | TC-RAD-05 | Saturation/no-data clip + `SATURATED`/`NO_DATA` | CN | REQ-F-RAD-04 · C-PU-RAD |
 | TC-RAD-06 | `remove_dark_fft` optional path | CF | REQ-F-RAD-01 · C-PU-RAD |
 | TC-RAD-07 | NUC derivation (calibration mode) | CF | REQ-F-RAD-05 · C-PU-RAD |
-| TC-ENH-01 | Denoiser preserves flat signal within tol | CN | REQ-F-ENH-01 · C-PU-ENH |
-| TC-ENH-02 | Sharpen kernel applied + clipped | CN | REQ-F-ENH-02 · C-PU-ENH |
-| TC-ENH-03 | Toggle/default-off honoured | ST | REQ-F-ENH-03 · C-PU-ENH |
-| TC-ENH-04 | Disallowed method → `InputValidationError` | EX | REQ-F-ENH-03 · C-PU-ENH/PROFILE |
+| TC-ENH-01 | Denoise sub-step preserves flat signal within tol | CN | REQ-F-ENH-01 · C-PU-ENH |
+| TC-ENH-02 | MTFC (PSF deconvolution) restores known-PSF blur within tol; radiometry preserved | CN | REQ-F-ENH-02 · C-PU-ENH |
+| TC-ENH-03 | Denoise sub-step profile-configurable (method selectable per profile) | ST | REQ-F-ENH-03 · C-PU-ENH |
+| TC-ENH-04 | Disallowed denoise method → `InputValidationError` | EX | REQ-F-ENH-03 · C-PU-ENH/PROFILE |
+| TC-ENH-05 | Enhancement stage always runs (MTFC mandatory) even with denoise disabled | ST | REQ-F-ENH-03 · C-PU-ENH |
 | TC-TOA-01 | `dn_to_radiance` `L=(DN−o)·g` | CF | REQ-F-TOA-01 · C-PU-TOA |
 | TC-TOA-02 | heritage `radiance−=min` **not** applied | CF | REQ-F-TOA-01 · C-PU-TOA |
 | TC-TOA-03 | `radiance_to_reflectance` `ρ=πLd²/(E cosθ)`, clip[0,1] | CF | REQ-F-TOA-02 · C-PU-TOA |

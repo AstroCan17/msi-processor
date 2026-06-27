@@ -142,7 +142,7 @@ The three top-level components and their relationship:
                      │        ▼            ▲   ▲   ▲        │                        │
                      │   ┌──────────────────────────────────────────────────────┐  │
                      │   │            msi_processor.computing (C-COMPUTING)       │  │
-                     │   │   l0_decode → radiometric → [enhancement] → toa  ───►  │  │
+                     │   │   l0_decode → radiometric → enhancement → toa  ───►    │  │
                      │   │   coregistration → georeference → [pansharpen] ──►     │  │
                      │   │   atmospheric ;  qa (cross-cutting)                    │  │
                      │   │   each stage = pure Core + thin EOProcessingUnit Wrap  │  │
@@ -307,7 +307,7 @@ blocking strategy (used by the detailed design of <5.4>):
 |---|---|---|---|---|---|
 | C-PU-L0 l0_decode | DPM-M-L0 | low–med | low | full-frame assembly | per-band/per-detector line streaming |
 | C-PU-RAD radiometric | DPM-M-RAD | low | low | element-wise per band | line-chunked; per-detector vectors broadcast |
-| C-PU-ENH enhancement *(opt)* | DPM-M-ENH | med | med–high | FFT/wavelet/deconv kernels | tiled with halo; default-off |
+| C-PU-ENH enhancement | DPM-M-ENH | med | med–high | MTFC/PSF-deconvolution + denoise kernels | tiled with halo (mandatory) |
 | C-PU-TOA toa | DPM-M-TOA | low | low | element-wise scaling | line-chunked |
 | C-PU-COR coregistration | DPM-M-COR | med | high | feature detect/match (SIFT/FLANN/RANSAC) | per-band-pair on reference-band overview; full-band warp |
 | C-PU-GEO georeference | DPM-M-GEO | **high** | **high** | DEM ortho + resampling to grid | tiled resampling, windowed DEM reads |
@@ -356,7 +356,9 @@ for the toolchain and process detail. The Annex F <4.7>b items:
      (REQ-D-04, REQ-S-05). Cost: an up-front profile schema + validation (C-COM-PROFILE).
    - **One PU per stage with optional stages toggleable** (chosen) vs fused mega-stages. Benefit: level
      breakpoints, independent verification and re-run granularity (REQ-F-ORC-01, REQ-REL-02, REQ-M-04);
-     enhancement/pansharpen default-off where unvalidated (REQ-F-ENH-03). Cost: more inter-PU `EOProduct`
+     pansharpen is optional/default-off, while enhancement is **mandatory** (its MTF-compensation /
+     PSF-deconvolution sub-step is a required Level-1 image-quality restoration) with the denoise
+     sub-step profile-configurable (REQ-F-ENH-03). Cost: more inter-PU `EOProduct`
      hand-offs (mitigated by lazy Zarr).
    - **Chunked + optional Dask** (chosen) vs whole-product in memory. Benefit: bounded memory and
      horizontal scaling (REQ-F-ORC-02, REQ-P-05). Cost: tiling/halo handling in spatial PUs.
@@ -391,7 +393,7 @@ msi_processor                                   (software item)
 ├── computing            C-COMPUTING            (processing chain)
 │   ├── l0_decode        C-PU-L0    {core, unit}
 │   ├── radiometric      C-PU-RAD   {core, unit}
-│   ├── enhancement      C-PU-ENH   {core, unit}   (opt)
+│   ├── enhancement      C-PU-ENH   {core, unit}   (MTFC mandatory)
 │   ├── toa              C-PU-TOA   {core, unit}
 │   ├── coregistration   C-PU-COR   {core, unit}
 │   ├── georeference     C-PU-GEO   {core, unit}
@@ -469,7 +471,7 @@ governed by the SRF (RD-10), per Annex N.
 | C-COMPUTING | `msi_processor.computing` | package | Processing chain container | new | REQ-D-01, REQ-F-ORC-01 | — |
 | C-PU-L0 | `…computing.l0_decode` | PU (core+unit) | Decode/reformat `L0c`→`L1A`, loss handling, assembly | reuse-adapt (RD-9 `level_0`) | REQ-F-L0-01..05 | DPM-M-L0 / ALG-L0-* |
 | C-PU-RAD | `…computing.radiometric` | PU (core+unit) | Dark/DSNU, NUC/PRNU, BPR, saturation/no-data | reuse-adapt (RD-9 `level_1.NUC`) | REQ-F-RAD-01..05 | DPM-M-RAD / ALG-RAD-* |
-| C-PU-ENH | `…computing.enhancement` | PU (core+unit) *(opt)* | Denoise + sharpen, radiometry-preserving | reuse-adapt (RD-9 `level_1.Denoiser`,`sharpening`) | REQ-F-ENH-01..03 | DPM-M-ENH / ALG-ENH-* |
+| C-PU-ENH | `…computing.enhancement` | PU (core+unit) | **MTF compensation (MTFC via PSF deconvolution, mandatory)** + configurable denoise, radiometry-preserving | reuse-adapt (RD-9 `level_1.Denoiser`,`sharpening`) | REQ-F-ENH-01..03 | DPM-M-ENH / ALG-ENH-* |
 | C-PU-TOA | `…computing.toa` | PU (core+unit) | DN→TOA radiance (+opt reflectance), emit `L1B` | reuse-adapt (RD-9 `level_1.TOA`) | REQ-F-TOA-01..03 | DPM-M-TOA / ALG-TOA-* |
 | C-PU-COR | `…computing.coregistration` | PU (core+unit) | Inter-band co-registration to reference band | reuse-adapt (RD-9 `band_coreg`) | REQ-F-COR-01..03 | DPM-M-COR / ALG-COR-* |
 | C-PU-GEO | `…computing.georeference` | PU (core+unit) | Viewing-model geoloc + GCP + DEM ortho → `L1C` | reuse-adapt (RD-9 `georeferencing_v1`) | REQ-F-GEO-01..04 | DPM-M-GEO / ALG-GEO-* |
@@ -764,11 +766,16 @@ fail-stop. NUC singularity (`F==D` detector) and out-of-range gain are handled a
 `DEFECTIVE`), not exceptions. All outputs clipped to the valid range (REQ-F-RAD-04, REQ-D-05). Open point
 (ATBD <5.2>): non-linear response term is `[impl]`.
 
-#### <5.4.4> C-PU-ENH — `enhancement` *(optional)* (DPM-M-ENH; ALG-ENH-*)
+#### <5.4.4> C-PU-ENH — `enhancement` *(mandatory)* (DPM-M-ENH; ALG-ENH-*)
 
-**Identifier/type.** `msi_processor.computing.enhancement`; PU *(opt)*; intermediate (`DPM-BKP-ENH`).
-**Purpose & trace.** Profile-selected denoise + sharpen, radiometry-preserving, default-off where
-unvalidated. *Trace:* REQ-F-ENH-01..03; DPM-M-ENH; ALG-ENH-BWLP/WAVE/PCA/MA/GAUSS/FFTDARK/DECONV.
+**Identifier/type.** `msi_processor.computing.enhancement`; PU *(mandatory)*; intermediate (`DPM-BKP-ENH`).
+**Purpose & trace.** **Mandatory** Level-1 image-quality restoration: **MTF compensation (MTFC) via PSF
+deconvolution** (mandatory sub-step — recovers the high-spatial-frequency content attenuated by the
+instrument MTF: optics + detector + platform motion) plus a profile-configurable denoise sub-step,
+radiometry-preserving. The stage **always runs** because MTFC is mandatory; MTFC materially affects
+radiometric/spatial product quality. **Change note (CR):** enhancement promoted to mandatory;
+"sharpening" = MTFC / PSF deconvolution. *Trace:* REQ-F-ENH-01..03; DPM-M-ENH;
+ALG-ENH-BWLP/WAVE/PCA/MA/GAUSS/FFTDARK/DECONV.
 
 **Pure-core — signatures & data structures** (`enhancement.core`):
 
@@ -789,9 +796,12 @@ def moving_average(image, n: int = 60) -> np.ndarray: ...             # ALG-ENH-
 def gaussian_smooth(image, ksize=5, sigma=None) -> np.ndarray: ...    # ALG-ENH-GAUSS (σ=std if None)
 def fft_dark_subtract(image, dark) -> np.ndarray: ...                 # ALG-ENH-FFTDARK
 
-def sharpen(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-    """ALG-ENH-DECONV (heritage sharpening.deconvolution_kernel; cv2.filter2D), clipped.
-    PSF-derived per-band kernel; a broader kernel for the PAN band. Kernel = profile data."""
+def mtf_compensate(image: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
+    """ALG-ENH-DECONV — MTF compensation (MTFC) via PSF deconvolution (MANDATORY sub-step).
+    Restores the high-spatial-frequency content attenuated by the instrument MTF
+    (optics + detector + platform motion); materially affects radiometric/spatial quality.
+    Heritage sharpening.deconvolution_kernel (cv2.filter2D), clipped. PSF-derived per-band
+    kernel (broader for the PAN band); PSF/kernel = profile/ADF data."""
 ```
 
 **EOProcessingUnit wrapper — `run()` I/O** (`enhancement.unit.EnhancementUnit`):
@@ -800,17 +810,19 @@ def sharpen(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 |---|---|
 | `inputs` | `{"rad": EOProduct}` |
 | `adfs` | `{"dark"}` (only if `fft_dark`) |
-| `outputs` | `{"enh": EOProduct}` (enhanced bands + QA-metric deltas via C-PU-QA) |
-| `parameters` | `{denoise:{method,params}, sharpen:{kernel}, enabled}` (`DPM-PRM-ENH-01..05`); per-band overrides |
-| `modes` | `"default"`; the stage is **skipped** when `optional_stages.enhancement=false` (REQ-F-ENH-03) |
+| `outputs` | `{"enh": EOProduct}` (MTFC-restored, optionally denoised bands + QA-metric deltas via C-PU-QA) |
+| `parameters` | `{mtfc:{psf_kernel}, denoise:{method,params,enabled}}` (`DPM-PRM-ENH-01..05`); per-band overrides |
+| `modes` | `"default"`; the stage **always runs** (MTFC mandatory); only the denoise sub-step is profile-configurable (REQ-F-ENH-03) |
 
-**Computing-model JSON** (`models/msi_enhancement_1.0.0.json`): `inputs:[rad]`, `adfs:[{dark,false}]`,
-`outputs:[enh]`, `parameters` carrying the nested `denoise`/`sharpen` objects, `modes:["default"]`.
+**Computing-model JSON** (`models/msi_enhancement_1.0.0.json`): `inputs:[{rad,true}]`, `adfs:[{dark,false}]`,
+`outputs:[{enh,true}]`, `parameters` carrying the nested `mtfc` (PSF deconvolution, always applied) and
+`denoise` (configurable) objects, `modes:["default"]`.
 
-**Error/exception handling.** Optional and individually toggleable; defaults to disabled where not
-validated (REQ-F-ENH-03). Outputs always clipped to the valid range; radiometric impact reported via QA
-metrics (REQ-F-QA-01), never silently applied. Method-not-in-allowed-set ⇒ `InputValidationError` at
-profile validation (C-COM-PROFILE), not at run.
+**Error/exception handling.** Mandatory stage — MTFC (PSF deconvolution) is always applied; only the
+denoise sub-step is profile-configurable (REQ-F-ENH-03). Outputs always clipped to the valid range;
+radiometric impact reported via QA metrics (REQ-F-QA-01), never silently applied. A missing/invalid PSF
+kernel or a denoise method-not-in-allowed-set ⇒ `InputValidationError` at profile validation
+(C-COM-PROFILE), not at run.
 
 #### <5.4.5> C-PU-TOA — `toa` (DPM-M-TOA; ALG-TOA-RAD/REF)
 
@@ -842,13 +854,13 @@ def solar_geometry(acq_time: "datetime", lon: float, lat: float) -> tuple[float,
 
 | Aspect | Value |
 |---|---|
-| `inputs` | `{"rad"|"enh": EOProduct}` (the latter if enhancement ran) |
+| `inputs` | `{"enh": EOProduct}` (enhancement is a mandatory upstream stage) |
 | `adfs` | `{"radiometric"}` (mandatory), `{"spectral"}` (for reflectance) — ICD <5.3.2>A |
 | `outputs` | `{"l1b": EOProduct}` — `/measurements/radiance/<band>` (+ `/measurements/reflectance/<band>`), QA, provenance |
 | `parameters` | `emit_reflectance` (`DPM-PRM-TOA-03`), `esun` per band & geometry source (`DPM-PRM-TOA-01/02`, mostly ADF/derived) |
 | `modes` | `"default"` |
 
-**Computing-model JSON** (`models/msi_toa_1.0.0.json`): `inputs:[{rad|enh}]`,
+**Computing-model JSON** (`models/msi_toa_1.0.0.json`): `inputs:[{enh}]`,
 `adfs:[{radiometric,true},{spectral,false}]`, `outputs:[l1b]`,
 `parameters:{emit_reflectance:{boolean,default:false}}`, `modes:["default"]`.
 
