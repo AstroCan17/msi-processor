@@ -1,0 +1,491 @@
+default:
+  interruptible: true
+  # Speed up CI by using prepared image with all the required tools
+  image: registry.eopf.copernicus.eu/sde/cpm-build-environment:latest
+
+stages:
+  - unit tests
+  - quality-checks
+  - build
+  - deliver
+  - integration tests
+  # The documentation include test reports, meaning that the documentation
+  # generation can only be tested and run once they are available.
+  # A separate stage has therefore been created for the documentation
+  # generation.
+  - documentation generation
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  BRANCH_NAME: $CI_COMMIT_REF_NAME
+  SOURCES: s2_msi_processor
+  TESTS: tests
+  REPORTS: .reports
+  PACKAGE_NAME: s2-msi-processor-docs
+  PACKAGE_FILENAME: ${PACKAGE_NAME}.tar.gz
+
+  # SonarQube configuration
+  SQ_PROJECTKEY: s2-msi-processor-sonarqube-key
+  SQ_PROJECTNAME: 's2-msi-processor'
+  SQ_ENCODING: UTF-8
+  SQ_PROJECTBASE: .
+  SQ_LANGUAGE: py
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      variables:
+        BRANCH_NAME: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "develop"
+      variables:
+        BRANCH_NAME: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+      variables:
+        BRANCH_NAME: $CI_COMMIT_TAG
+
+# UNIT TESTS SECTION
+validate-variables:
+  stage: unit tests
+  script:
+    - |
+      mandatoryVars="SQ_URL SQ_LOGIN \
+        DASK_GATEWAY__ADDRESS \
+        DASK_GATEWAY__AUTH__TYPE \
+        DASK_GATEWAY__PROXY_ADDRESS \
+        DASK_GATEWAY__PUBLIC_ADDRESS \
+        JUPYTERHUB_API_TOKEN"
+      found=true
+      for var in ${mandatoryVars}
+      do
+        if [[ -z ${!var} ]]
+        then
+          echo -e "\e[31mERROR: Required variable '${var}' is not set. Please set the variable before running the pipeline\e[0m"
+          found=false
+        fi
+      done
+      if ! ${found}
+      then
+        exit 1
+      fi
+
+linter:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[linter]
+  script:
+    - python -m flake8 ${SOURCES} ${TESTS} --output-file linter.txt
+  artifacts:
+    # The flake8 command will fail if there is any errors or warnings,
+    # which means that the artifact must also be uploaded for job failures.
+    expire_in: 3d
+    when: always
+    paths:
+      - linter.txt
+
+docker-linter:
+  stage: unit tests
+  # the hadolint binary is fetched in-job (Studio shell runner ignores `image:`).
+  # When the SDE Kubernetes runner lands this can revert to `image: hadolint/hadolint:latest-debian`.
+  before_script:
+    - HADOLINT_VERSION=2.12.0
+    - curl -sfL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o hadolint
+    - chmod +x hadolint
+  script:
+    - mkdir -p ${REPORTS}
+    - CHECKSUM=`md5sum Dockerfile | cut -d" " -f1`
+    - ./hadolint --config .hadolint.yml --format gitlab_codeclimate Dockerfile > ${REPORTS}/hadolint-${CHECKSUM}.json
+  artifacts:
+    name: "$CI_JOB_NAME artifacts from $CI_PROJECT_NAME on $CI_COMMIT_REF_SLUG"
+    expire_in: 1 day
+    when: always
+    reports:
+      codequality:
+        - "${REPORTS}/hadolint-*.json"
+
+formater:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[formatter]
+  script:
+    - python -m black --check --diff .
+    - python -m isort ${SOURCES} ${TESTS} --check --diff
+
+typing:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[typing]
+  script:
+    - python -m mypy ${SOURCES}
+
+unit-tests:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[tests]
+  script:
+    - >-
+      python -m pytest
+      --cov=${SOURCES}
+      --junit-xml=${REPORTS}/TEST-pytests.xml
+      --cov-report=xml:${REPORTS}/coverage.xml
+      -m unit
+  artifacts:
+    expire_in: 1h
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: $REPORTS/coverage.xml
+      junit: $REPORTS/TEST-*.xml
+    paths:
+      - ${REPORTS}
+      - .coverage
+
+security:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[security]
+  script:
+    # Generate requirements.txt file for runtime dependencies
+    # Using pip avoids depending on the structure of the 'pyproject.toml'.
+    # The 'requirements.txt' is used by the 'deps-sec' job.
+    - pip freeze > requirements.txt
+    - python -m bandit -c bandit.yml -r ${SOURCES}
+    - >-
+      python -m bandit -c bandit.yml -r ${SOURCES}
+      -f json -o vulnerability.json
+  artifacts:
+    expire_in: 1h
+    paths:
+      - vulnerability.json
+      - requirements.txt
+
+deps-sec:
+  stage: unit tests
+  image:
+    name: aquasec/trivy:0.36.0
+    entrypoint: [""]
+  needs: [security]
+  dependencies:
+    - security
+  script:
+    # Report for user
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ./
+  allow_failure: true
+
+docs-cov:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[doc-cov]
+  script:
+    - docstr-coverage -f -P -m -F 30 ${SOURCES} -b docstrcov.svg
+  artifacts:
+    paths:
+      - docstrcov.svg
+  allow_failure: true
+
+complexity:
+  stage: unit tests
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[complexity]
+  script:
+    - python -m xenon --max-average B --max-modules C --max-absolute D ${SOURCES}
+  allow_failure: true
+
+# SONARQUBE
+sonarqube:
+  stage: quality-checks
+  image: sonarsource/sonar-scanner-cli
+  needs:
+    - unit-tests
+    - linter
+    - security
+  dependencies:
+    - unit-tests
+    - linter
+    - security
+  variables:
+    SONAR_PROJECT_BASE_DIR: "${CI_PROJECT_DIR}"
+    GIT_DEPTH: 0
+  script:
+    # Do not comment out lines in the below bullet as that will also
+    # comment out all the following lines.
+    - >-
+      sonar-scanner -X
+      -Dsonar.qualitygate.wait=true
+      -Dsonar.host.url=${SQ_URL}
+      -Dsonar.login=${SQ_LOGIN}
+      -Dsonar.projectKey=${SQ_PROJECTKEY}
+      -Dsonar.projectName="${SQ_PROJECTNAME}"
+      -Dsonar.links.homepage=${CI_PROJECT_URL}
+      -Dsonar.projectBaseDir=${SQ_PROJECTBASE}
+      -Dsonar.branch.name=${BRANCH_NAME}
+      -Dsonar.sources=${SOURCES}
+      -Dsonar.tests=${TESTS}
+      -Dsonar.sourceEncoding=${SQ_ENCODING}
+      -Dsonar.language=${SQ_LANGUAGE}
+      -Dsonar.python.version=3.11
+      -Dsonar.python.flake8.reportPaths="linter.txt"
+      -Dsonar.python.bandit.reportPaths="vulnerability.json"
+      -Dsonar.python.xunit.reportPath="${REPORTS}/TEST-*.xml"
+      -Dsonar.python.coverage.reportPaths="${REPORTS}/coverage.xml"
+  allow_failure: true
+
+# BUILD SECTION
+build-package:
+  stage: build
+  script:
+    - pip wheel -w dist --no-deps .
+  artifacts:
+    paths:
+    - dist/
+
+# DELIVER SECTION
+deliver-package:
+  stage: deliver
+  needs: [build-package]
+  dependencies:
+    - build-package
+  script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install twine
+    - >-
+      TWINE_PASSWORD=${CI_REGISTRY_PASSWORD}
+      TWINE_USERNAME=${CI_REGISTRY_USER}
+      python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+  rules:
+    - if: $CI_COMMIT_TAG
+
+deliver-image:
+  stage: deliver
+  # kaniko needs a container runtime; the Studio shell runner has none, so this
+  # is non-blocking until the SDE Kubernetes runner lands. Mirrors eo-data-embedding.
+  allow_failure: true
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  # Default branch leaves tag empty (= latest tag)
+  # All other branches are tagged with the escaped branch name (commit ref slug)
+  script:
+    - |
+      if [[ "${CI_COMMIT_BRANCH}" == "${CI_DEFAULT_BRANCH}" ]]; then
+        tag=""
+        echo "Running on default branch '${CI_DEFAULT_BRANCH}': tag = 'latest'"
+      else
+        tag="${CI_COMMIT_REF_SLUG}"
+        echo "Running on branch '${CI_COMMIT_BRANCH}': tag = ${tag}"
+      fi
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --build-arg CI_COMMIT_SHA
+      --destination "${CI_REGISTRY_IMAGE}:${tag}"
+
+# INTEGRATION TESTS SECTION
+integration-tests:
+  stage: integration tests
+  # the template's Dask-gateway test needs a live gateway, unavailable from the
+  # Studio shell runner; non-blocking until real S2 integration tests land (Phase 1).
+  allow_failure: true
+  before_script:
+    # Although the container image includes the CPM and its dependencies,
+    # the 'pip install' is kept in case the dependencies are changed by
+    # the child project with regards to the CPM ones.
+    # In this case, creating a specific build image should be considered.
+    - pip install .[tests] .[notebook] .[cluster-plugin]
+  needs:
+    # The unit tests reports are extended with the coverage from the
+    # integration tests.
+    - unit-tests
+    # The integration tests rely on the container image uploaded
+    # into GitLab's container registry.
+    - job: deliver-image
+      artifacts: false
+  script:
+    - >-
+      python -m pytest
+      --cov=${SOURCES}
+      --cov-report=term-missing
+      --cov-append
+      --junit-xml=${REPORTS}/ITEST-pytests.xml
+      -m integration
+  artifacts:
+    expire_in: 1h
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: ${TEST_PROJECT}/${REPORTS}/coverage.xml
+      junit: ${TEST_PROJECT}/${REPORTS}/ITEST-*.xml
+    paths:
+      - ${TEST_PROJECT}/${REPORTS}/
+      - ${TEST_PROJECT}/.coverage
+
+# DOCUMENTATION GENERATION SECTION
+#
+# The documentation include unit and integration tests reports.
+# It must therefore be run after the unit and integration test jobs.
+sphinx-build:
+  # This job builds a single version of the documentation
+  # for the current branch.
+  stage: documentation generation
+  before_script:
+    # The documentation generation may require the project's
+    # Python dependencies to be installed when 'autodoc' is used.
+    - pip install .[doc]
+  script:
+    # Patch the sphinx configuration file to update the release value.
+    # This value is used by the version selector.
+    # Sphinx does not seem to support overriding theme configuration parameters
+    # with multiple levels, so the value must be patched before the generation.
+    - sed -i s+REPLACE_ME+${BRANCH_NAME}+ docs/conf.py
+    - grep 'release =' docs/conf.py
+
+    - sphinx-build -d /tmp/s2-msi-processor/doctrees docs test-docs
+  artifacts:
+    name: 's2-msi-processor-docs'
+    expose_as: 'Documentation'
+    paths:
+      # Allow consulting the generated documentation without
+      # overwriting the "official" documentation made available with
+      # GitLab Pages.
+      - test-docs/
+    expire_in: 1 week
+
+upload-documentation:
+  # This job uploads the generation documentation for tags and
+  # the main branch.
+  stage: documentation generation
+  needs:
+    - sphinx-build
+  script:
+    # List the existing packages to obtain the URL allowing to delete
+    # a package.
+    # The first time the pipeline is run, no documentation archive will be
+    # present in the project's package registry.
+    - 'curl --output packages.json --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&order_by=version&sort=desc"'
+    - PACKAGE_VERSIONS=`jq --raw-output ".[].version" packages.json`
+
+    # Create archive with the current branch/tag's documentation.
+    # Other/previous versions are already stored in dedicated package versions.
+    - mkdir -p public
+    - mv test-docs public/${BRANCH_NAME}
+    - tar cfz ${PACKAGE_FILENAME} public/${BRANCH_NAME}
+
+    # GitLab allows storing multiple files under the same package/version.
+    # If the same archive file (same filename) is uploaded multiple times,
+    # GitLab will store multiple versions of the file.
+    # See https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#publishing-a-package-with-the-same-name-or-version
+    # To not explode, the previous package is therefore removed before
+    # uploading the new documentation archive.
+    #
+    # Retrieve the delete link of the package for the current branch/tag
+    # The version will not exist the first time the documentation
+    # is built for a given branch/tag.
+    - DELETE_URL=`jq --raw-output ".[] | select(.version == \"${BRANCH_NAME}\") | ._links.delete_api_path" packages.json`
+    - |
+      if [[ "_${DELETE_URL}" != "_" ]]; then
+        echo "Deleting package: ${DELETE_URL}"
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --request DELETE "${DELETE_URL}"
+      fi
+
+    # Upload archive
+    - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --request PUT --upload-file ${PACKAGE_FILENAME} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${BRANCH_NAME}/${PACKAGE_FILENAME}"'
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+pages:
+  # This job generates the SDE documentation.
+  # It only runs on the 'main' branch and for tags.
+  # The documentation is then deployed using GitLab Pages.
+  #
+  # The job allows publishing multiple versions of the documentation.
+  # The documentation generated for a branch is stored in GitLab's package registry
+  # as versioned, generic packages.
+  # The branch/tag of the CI pipeline is used to define the version.
+  #
+  # Before the start of the generation of the current version,
+  # all previous documentation packages are aggregated into GitLab Pages'
+  # 'public' directory.
+  stage: documentation generation
+  needs:
+    - upload-documentation
+  script:
+    # Make sure the target directory is initialized.
+    - mkdir -p public
+
+    # Download documentation archives built for previous versions.
+    # The first time the pipeline is run, no documentation archive will be
+    # present in the project's package registry.
+    - 'curl --output packages.json --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&order_by=version&sort=desc"'
+    - PACKAGE_VERSIONS=`jq --raw-output ".[].version" packages.json`
+    - |
+      for VERSION in ${PACKAGE_VERSIONS}
+      do
+        echo "Downloading ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${VERSION}/${PACKAGE_FILENAME}"
+
+        # Download package file
+        curl --output ${PACKAGE_FILENAME} --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${VERSION}/${PACKAGE_FILENAME}"
+
+        # Untar documentation into target
+        tar xfz ${PACKAGE_FILENAME}
+      done
+
+    # Create/override redirect to main
+    #
+    # The URLs of the redirect file depend on the group nesting level
+    # of the Git repository. If the project is in a subgroup, then this
+    # subgroup must be included in the redirect file:
+    # Ex:
+    #   echo -e "/${SUBGROUP}/${CI_PROJECT_NAME}/ /${SUBGROUP}/${CI_PROJECT_NAME}/${CI_DEFAULT_BRANCH}/index.html 301\n/${SUBGROUP}/${CI_PROJECT_NAME}/index.html /${SUBGROUP}/${CI_PROJECT_NAME}/${CI_DEFAULT_BRANCH}/index.html 301" > public/_redirects
+    # Redirect for a project with a single group level:
+    - echo -e "/${CI_PROJECT_NAME}/ /${CI_PROJECT_NAME}/${CI_DEFAULT_BRANCH}/index.html 301\n/${CI_PROJECT_NAME}/index.html /${CI_PROJECT_NAME}/${CI_DEFAULT_BRANCH}/index.html 301" > public/_redirects
+
+    # Generate the list of switchable documentation versions.
+    # The available documentation packages in GitLab's package registry
+    # is used as input.
+    # Please remove the unwanted packages and rerun the CI pipeline
+    # to remove versions from the documentation made available by
+    # GitLab Pages.
+    - JSON_VERSIONS=`jq --compact-output '[ .[].version ]' packages.json`
+    # The pipe operator eases defining the json string below
+    - |
+      jq --null-input --argjson jqversions "${JSON_VERSIONS}" --from-file <(echo '[$jqversions[] as $version | {"version":$version,"url": ("https://ipf.pages.eopf.copernicus.eu/s2-msi-processor/" + $version + "/")}]') > public/versions.json
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  artifacts:
+    paths:
+      - public/
