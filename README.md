@@ -16,9 +16,43 @@
 
 # msi-processor
 
-This repository contains the msi-processor project.
+This repository contains the **msi-processor** project: a generic high-resolution
+pushbroom multispectral imager (MSI) ground-segment data processor that turns downlinked
+raw (Level-0) instrument data into calibrated, geophysically usable products up to Level 2.
+It is built on the ESA EOPF Core Python Modules (CPM, `eopf == 2.8.1`, Zarr output) and
+developed under an ECSS-E-ST-40C Rev.1 (software criticality Category C),
+documentation-first software lifecycle.
 
-Operational Sentinel-2 MSI L0c to L2A processor built on EOPF CPM
+## Processing chain & status
+
+End-to-end L0 → L2 processing chain. 🟢 implemented (CI-green) · ⬜ planned.
+
+```mermaid
+flowchart TD
+    RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>L0 → L1A"]:::todo
+    L0 --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>L1A"]:::done
+    RAD --> ENH["enhancement (opt)<br/>denoise · sharpen<br/>L1B"]:::todo
+    ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::todo
+    TOA --> COR["coregister<br/>band co-registration<br/>L1C"]:::todo
+    COR --> GEO["georeference<br/>ortho · GCP · orbit<br/>L1C"]:::todo
+    GEO --> PAN["pansharpen (opt)<br/>L1C"]:::todo
+    PAN --> ATM["atmospheric — NEW<br/>BOA reflectance<br/>L2A"]:::todo
+    ATM --> PRD[/"L2 Zarr products"/]
+
+    FOUND["foundation · DONE<br/>common (types, metrics) · exceptions · sensors profile"]:::done
+
+    classDef done fill:#1f7a1f,color:#fff,stroke:#0d3d0d,stroke-width:2px;
+    classDef todo fill:#3f3f3f,color:#eee,stroke:#222;
+```
+
+**Implemented:** the foundation (common types/metrics, exception hierarchy, sensor profile)
+and the `radiometric` processing unit (NUC / dark / bad-pixel repair / saturation), with
+synthetic unit tests.
+**Planned:** `l0_decode`, `enhancement`, `toa`, `coregister`, `georeference`, `pansharpen`,
+`atmospheric` (Level-2).
+
+**ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the
+baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …).
 
 ## Project Structure
 
