@@ -19,7 +19,7 @@
 ## Introduction
 
 This section constitutes the Configuration item data list (CIDL) for the
-s2-msi-processor project.
+msi-processor project.
 
 ```{note}
 The introduction shall describe the purpose and objective of the configuration item data list.

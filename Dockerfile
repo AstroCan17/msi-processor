@@ -33,15 +33,15 @@ FROM python:3.11.7-bullseye as build
 # Please use read-only tokens to access the GitLab package registries.
 ENV PIP_EXTRA_INDEX_URL "https://eopf:LXMYBdDVhRqNqMSB1Rn8@gitlab.eopf.copernicus.eu/api/v4/projects/14/packages/pypi/simple"
 
-# Install s2_msi_processor from source.
+# Install msi_processor from source.
 #
 # This solution has been chosen to allow building an image for the latest state
 # of the "main" branch without previously uploading a fixed version of the
 # corresponding Python package into the package registry,
 # thus simplifying the testing of the "main" branch.
-COPY . /opt/s2_msi_processor
+COPY . /opt/msi_processor
 # Skip the "bin not on PATH" warning: This is only a build container.
-RUN pip install --user --no-cache-dir --no-warn-script-location /opt/s2_msi_processor[cluster-plugin]
+RUN pip install --user --no-cache-dir --no-warn-script-location /opt/msi_processor[cluster-plugin]
 
 # Final stage
 #
@@ -55,10 +55,10 @@ FROM registry.eopf.copernicus.eu/sde/dask-container-images/dask-scheduler-worker
 # OCI annotations
 # See https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
 ARG CI_COMMIT_SHA
-LABEL org.opencontainers.image.title="s2-msi-processor Dask runtime"
-LABEL org.opencontainers.image.description="Dask runtime environment including the s2-msi-processor"
-LABEL org.opencontainers.image.source="https://gitlab.eopf.copernicus.eu/ipf/s2-msi-processor/"
-LABEL org.opencontainers.image.url="https://gitlab.eopf.copernicus.eu/ipf/s2-msi-processor/-/blob/main/Dockerfile"
+LABEL org.opencontainers.image.title="msi-processor Dask runtime"
+LABEL org.opencontainers.image.description="Dask runtime environment including the msi-processor"
+LABEL org.opencontainers.image.source="https://gitlab.eopf.copernicus.eu/ipf/msi-processor/"
+LABEL org.opencontainers.image.url="https://gitlab.eopf.copernicus.eu/ipf/msi-processor/-/blob/main/Dockerfile"
 LABEL org.opencontainers.image.revision="$CI_COMMIT_SHA"
 LABEL org.opencontainers.image.vendor="ESA"
 LABEL org.opencontainers.image.authors="AstroCan17"

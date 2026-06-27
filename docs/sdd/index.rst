@@ -18,7 +18,7 @@ Software design document
 ========================
 
 This section constitutes the Software design document (SDD) for the
-s2-msi-processor project.
+msi-processor project.
 
 .. toctree::
    :maxdepth: 1

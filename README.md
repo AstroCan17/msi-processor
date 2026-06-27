@@ -14,9 +14,9 @@
   limitations under the License.
 -->
 
-# s2-msi-processor
+# msi-processor
 
-This repository contains the s2-msi-processor project.
+This repository contains the msi-processor project.
 
 Operational Sentinel-2 MSI L0c to L2A processor built on EOPF CPM
 
@@ -24,10 +24,10 @@ Operational Sentinel-2 MSI L0c to L2A processor built on EOPF CPM
 
 This project is organized as follows:
 
-* `docs` contains the source of the `s2-msi-processor` documentation.
-* `s2_msi_processor` contains the source code of the
+* `docs` contains the source of the `msi-processor` documentation.
+* `msi_processor` contains the source code of the
   project's main Python package.
-* `tests` contains the unit and integration tests of the `s2-msi-processor`
+* `tests` contains the unit and integration tests of the `msi-processor`
   project.
 
 ## Tools
@@ -50,12 +50,12 @@ The following tools are used by this project:
 
 ## Documentation
 
-The `s2-msi-processor` documentation is available online at
-https://ipf.pages.eopf.copernicus.eu/s2-msi-processor.
+The `msi-processor` documentation is available online at
+https://ipf.pages.eopf.copernicus.eu/msi-processor.
 
 ## Build
 
-To build the Python module of the s2-msi-processor project using `wheel`, run:
+To build the Python module of the msi-processor project using `wheel`, run:
 
 ``` python
 pip wheel -w dist --no-deps .
