@@ -17,7 +17,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "s2_msi_processor"
+name = "msi_processor"
 authors = [{name = "AstroCan17"}]
 dynamic = ["version", "description"]
 readme = "README.md"

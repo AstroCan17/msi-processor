@@ -18,15 +18,15 @@ stages:
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   BRANCH_NAME: $CI_COMMIT_REF_NAME
-  SOURCES: s2_msi_processor
+  SOURCES: msi_processor
   TESTS: tests
   REPORTS: .reports
-  PACKAGE_NAME: s2-msi-processor-docs
+  PACKAGE_NAME: msi-processor-docs
   PACKAGE_FILENAME: ${PACKAGE_NAME}.tar.gz
 
   # SonarQube configuration
-  SQ_PROJECTKEY: s2-msi-processor-sonarqube-key
-  SQ_PROJECTNAME: 's2-msi-processor'
+  SQ_PROJECTKEY: msi-processor-sonarqube-key
+  SQ_PROJECTNAME: 'msi-processor'
   SQ_ENCODING: UTF-8
   SQ_PROJECTBASE: .
   SQ_LANGUAGE: py
@@ -372,9 +372,9 @@ sphinx-build:
     - sed -i s+REPLACE_ME+${BRANCH_NAME}+ docs/conf.py
     - grep 'release =' docs/conf.py
 
-    - sphinx-build -d /tmp/s2-msi-processor/doctrees docs test-docs
+    - sphinx-build -d /tmp/msi-processor/doctrees docs test-docs
   artifacts:
-    name: 's2-msi-processor-docs'
+    name: 'msi-processor-docs'
     expose_as: 'Documentation'
     paths:
       # Allow consulting the generated documentation without
@@ -482,7 +482,7 @@ pages:
     - JSON_VERSIONS=`jq --compact-output '[ .[].version ]' packages.json`
     # The pipe operator eases defining the json string below
     - |
-      jq --null-input --argjson jqversions "${JSON_VERSIONS}" --from-file <(echo '[$jqversions[] as $version | {"version":$version,"url": ("https://ipf.pages.eopf.copernicus.eu/s2-msi-processor/" + $version + "/")}]') > public/versions.json
+      jq --null-input --argjson jqversions "${JSON_VERSIONS}" --from-file <(echo '[$jqversions[] as $version | {"version":$version,"url": ("https://ipf.pages.eopf.copernicus.eu/msi-processor/" + $version + "/")}]') > public/versions.json
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG

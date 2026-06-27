@@ -19,7 +19,7 @@ from eopf.product import EOGroup, EOProduct, EOVariable
 
 # You might have to reformat the imports depending on the length
 # of the package name that is given when generating your project.
-from s2_msi_processor.computing.my_processing_unit import MyProcessingUnit
+from msi_processor.computing.my_processing_unit import MyProcessingUnit
 
 
 class MyProcessingUnitTest(unittest.TestCase):

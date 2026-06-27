@@ -19,7 +19,7 @@
 ## Introduction
 
 This section constitutes the Software reuse file (SRF) for
-the s2-msi-processor project.
+the msi-processor project.
 
 The first level dependencies are listed in the following sections.
 

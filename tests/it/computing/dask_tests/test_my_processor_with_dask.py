@@ -21,7 +21,7 @@ import pytest
 from dask_gateway import Gateway
 from eopf.logging import EOLogging
 
-from s2_msi_processor.exceptions.warnings import MyWarning
+from msi_processor.exceptions.warnings import MyWarning
 
 
 class MyProcessorDaskTest(unittest.TestCase):
