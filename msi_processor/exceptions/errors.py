@@ -12,6 +12,102 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Typed exception hierarchy — the fault-containment vocabulary of SDD <5.2>g.
+
+A pure core raises a typed :class:`MsiProcessorError` subclass on a
+precondition / acceptance violation; the ``EOProcessingUnit`` wrapper catches
+it, attaches the relevant ``QAFlag`` and report fields, and re-raises to the
+chain runner, which applies fail-stop (REQ-F-DEP-01). Observational
+deviations (a QA metric out of tolerance) are warnings, never exceptions.
+
+The class set mirrors SDD <5.4.1>. ``MsiProcessorError`` carries ``.stage``,
+``.qa_flag`` and ``.report_fields`` for structured reporting.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+__all__ = [
+    "MyError",
+    "MsiProcessorError",
+    "InputValidationError",
+    "ProfileValidationError",
+    "AdfResolutionError",
+    "RadiometricError",
+    "CoregistrationError",
+    "GeolocationError",
+    "AtmosphericError",
+    "ProductWriteError",
+]
+
 
 class MyError(Exception):
-    """Raised when an error occurs."""
+    """Raised when an error occurs.
+
+    Retained from the project template for backward compatibility; new code
+    should raise a :class:`MsiProcessorError` subclass instead.
+    """
+
+
+class MsiProcessorError(Exception):
+    """Base class of all ``msi-processor`` typed errors (SDD <5.2>g, <5.4.1>).
+
+    Parameters
+    ----------
+    message:
+        Human-readable description of the failure.
+    stage:
+        The processing stage that raised the error (e.g. ``"radiometric"``),
+        used in the structured processing report.
+    qa_flag:
+        The QA bit to attach to affected pixels, if any.
+    report_fields:
+        Extra machine-readable fields for the processing report
+        (``ICD-IF-DIAG``); never contains private calibration values.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        stage: Optional[str] = None,
+        qa_flag: Optional[int] = None,
+        report_fields: Optional[dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.qa_flag = qa_flag
+        self.report_fields: dict[str, Any] = report_fields if report_fields is not None else {}
+
+
+class InputValidationError(MsiProcessorError):
+    """Malformed / mismatched input product (REQ-F-L0-03, REQ-DAT-03)."""
+
+
+class ProfileValidationError(MsiProcessorError):
+    """Invalid / incomplete sensor profile (REQ-DAT-03; C-COM-PROFILE)."""
+
+
+class AdfResolutionError(MsiProcessorError):
+    """Missing or validity-mismatched ADF (REQ-S-04; C-COM-ADF)."""
+
+
+class RadiometricError(MsiProcessorError):
+    """Radiometric-stage failure (REQ-F-RAD-*)."""
+
+
+class CoregistrationError(MsiProcessorError):
+    """Insufficient matches / residual out of acceptance (REQ-F-COR-03)."""
+
+
+class GeolocationError(MsiProcessorError):
+    """Missing DEM / viewing-model coverage (REQ-F-GEO-*)."""
+
+
+class AtmosphericError(MsiProcessorError):
+    """Atmospheric-correction failure (REQ-F-ATM-*)."""
+
+
+class ProductWriteError(MsiProcessorError):
+    """Product store / write failure (REQ-F-PRD-01; C-COM-PRODUCT)."""
