@@ -57,7 +57,7 @@ class MyProcessingUnit(EOProcessingUnit):
         --------
         Usage examples can be added as Jupyter notebook cells.
 
-        .. jupyter-execute::
+        .. code-block:: python
 
           # All required imports
           from eopf.product import EOProduct
