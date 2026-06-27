@@ -774,7 +774,11 @@ deconvolution** (mandatory sub-step — recovers the high-spatial-frequency cont
 instrument MTF: optics + detector + platform motion) plus a profile-configurable denoise sub-step,
 radiometry-preserving. The stage **always runs** because MTFC is mandatory; MTFC materially affects
 radiometric/spatial product quality. **Change note (CR):** enhancement promoted to mandatory;
-"sharpening" = MTFC / PSF deconvolution. *Trace:* REQ-F-ENH-01..03; DPM-M-ENH;
+"sharpening" = MTFC / PSF deconvolution. **Change note (CR-3):** the PSF/MTF kernel is now the
+**mandatory** per-band `psf` ADF (DPM-ADF-PSF) — per-band 2-D kernels (focal-plane geometry),
+float32, normalised to unit DC gain (sum=1) so radiometry is preserved, referenced by ADF URI
+(values not reproduced here) and opened read-only — not a parameter; the optional `dark` ADF
+(fft_dark only) is retained. *Trace:* REQ-F-ENH-01..03; DPM-M-ENH;
 ALG-ENH-BWLP/WAVE/PCA/MA/GAUSS/FFTDARK/DECONV.
 
 **Pure-core — signatures & data structures** (`enhancement.core`):
@@ -801,7 +805,8 @@ def mtf_compensate(image: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
     Restores the high-spatial-frequency content attenuated by the instrument MTF
     (optics + detector + platform motion); materially affects radiometric/spatial quality.
     Heritage sharpening.deconvolution_kernel (cv2.filter2D), clipped. PSF-derived per-band
-    kernel (broader for the PAN band); PSF/kernel = profile/ADF data."""
+    kernel (broader for the PAN band); `psf_kernel` is sourced at run() from the mandatory
+    `psf` ADF (DPM-ADF-PSF), not a parameter."""
 ```
 
 **EOProcessingUnit wrapper — `run()` I/O** (`enhancement.unit.EnhancementUnit`):
@@ -809,19 +814,19 @@ def mtf_compensate(image: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
 | Aspect | Value |
 |---|---|
 | `inputs` | `{"rad": EOProduct}` |
-| `adfs` | `{"dark"}` (only if `fft_dark`) |
+| `adfs` | `{"psf"}` (**mandatory** — `DPM-ADF-PSF`, per-band 2-D PSF/MTF kernel for MTFC, float32, unit-DC-gain normalised, by URI/read-only), `{"dark"}` (optional, only if `fft_dark`) |
 | `outputs` | `{"enh": EOProduct}` (MTFC-restored, optionally denoised bands + QA-metric deltas via C-PU-QA) |
-| `parameters` | `{mtfc:{psf_kernel}, denoise:{method,params,enabled}}` (`DPM-PRM-ENH-01..05`); per-band overrides |
+| `parameters` | `{mtfc:{regularization}, denoise:{method,params,enabled}}` (`DPM-PRM-ENH-01..05`); per-band overrides. PSF kernel is the mandatory `psf` ADF (`DPM-ADF-PSF`), no longer a parameter |
 | `modes` | `"default"`; the stage **always runs** (MTFC mandatory); only the denoise sub-step is profile-configurable (REQ-F-ENH-03) |
 
-**Computing-model JSON** (`models/msi_enhancement_1.0.0.json`): `inputs:[{rad,true}]`, `adfs:[{dark,false}]`,
-`outputs:[{enh,true}]`, `parameters` carrying the nested `mtfc` (PSF deconvolution, always applied) and
-`denoise` (configurable) objects, `modes:["default"]`.
+**Computing-model JSON** (`models/msi_enhancement_1.0.0.json`): `inputs:[{rad,true}]`, `adfs:[{psf,true},{dark,false}]`,
+`outputs:[{enh,true}]`, `parameters` carrying the nested `mtfc` (PSF deconvolution, always applied; kernel
+from the `psf` ADF) and `denoise` (configurable) objects, `modes:["default"]`.
 
 **Error/exception handling.** Mandatory stage — MTFC (PSF deconvolution) is always applied; only the
 denoise sub-step is profile-configurable (REQ-F-ENH-03). Outputs always clipped to the valid range;
-radiometric impact reported via QA metrics (REQ-F-QA-01), never silently applied. A missing/invalid PSF
-kernel or a denoise method-not-in-allowed-set ⇒ `InputValidationError` at profile validation
+radiometric impact reported via QA metrics (REQ-F-QA-01), never silently applied. A missing/invalid `psf`
+ADF (`DPM-ADF-PSF`) or a denoise method-not-in-allowed-set ⇒ `InputValidationError` at profile validation
 (C-COM-PROFILE), not at run.
 
 #### <5.4.5> C-PU-TOA — `toa` (DPM-M-TOA; ALG-TOA-RAD/REF)
@@ -1207,7 +1212,7 @@ layout and the profile-file schema) are now controlled in the ICD (RD-5 <5.3.2/3
 | IF-PROD-05 | C-PU-GEO/PAN → C-PU-ATM (`L2A`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L2A` | BOA reflectance, `quality/scene_classification`, masks, QA, provenance |
 | IF-CORE-01 | C-PU-*.unit → C-PU-*.core | pure function call | `BandStack` in / (`BandStack` \| arrays + `MetricSet`/residuals) out; **no CPM/IO** (<5.4.1>) |
 | IF-SVC-01 | C-PU-*.unit → C-COM-PRODUCT | function call | `build_eoproduct`/`read`/`write`/`extract_band_stack` |
-| IF-SVC-02 | C-PU-*.unit → C-COM-ADF | function call (URI) | `AuxiliaryDataFile` → `AdfData` (dark, PRNU, gain/offset, BPM, viewing model, DEM, AOT/WV) |
+| IF-SVC-02 | C-PU-*.unit → C-COM-ADF | function call (URI) | `AuxiliaryDataFile` → `AdfData` (dark, PRNU, gain/offset, BPM, PSF/MTF kernel (`DPM-ADF-PSF`), viewing model, DEM, AOT/WV) |
 | IF-SVC-03 | C-PU-*.unit → C-COM-PROFILE | function call | `Profile` (per-stage parameter block) |
 | IF-SVC-04 | C-PU-*.unit → C-COM-QAFLAG | function call | `np.ndarray` uint16 QA layer (`set_flag`/`merge`) |
 | IF-SVC-05 | C-PU-*.unit → C-COM-PROV | function call | provenance `dict` (ids/versions/params/timestamp) |
