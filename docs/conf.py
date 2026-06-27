@@ -36,7 +36,7 @@ os.environ["PYTHONPATH"] = ":".join((package_path, os.environ.get("PYTHONPATH", 
 
 # -- Project information -----------------------------------------------------
 
-project = "s2-msi-processor"
+project = "msi-processor"
 copyright = "2023 ESA"
 author = "Can Deniz Kaya"
 
@@ -74,7 +74,7 @@ templates_path = ["_templates"]
 # a list of builtin themes.
 html_theme = "sphinx_book_theme"
 html_theme_options = {
-    "repository_url": "https://gitlab.eopf.copernicus.eu/ipf/s2-msi-processor",
+    "repository_url": "https://gitlab.eopf.copernicus.eu/ipf/msi-processor",
     "repository_branch": "main",
     "use_edit_page_button": True,
     # The 'open issue' button is not yet supported for GitLab
@@ -86,7 +86,7 @@ html_theme_options = {
     "logo": {
         # The logo image attributes must be set directly in the
         # _static/navbar-logo.html template
-        "text": "s2-msi-processor",
+        "text": "msi-processor",
     },
     "primary_sidebar_end": ["navbar-footer.html"],
     # The version switcher is disabled until a versions.json is published to
@@ -96,7 +96,7 @@ html_theme_options = {
 # The logo image attributes must be set directly in the
 # _static/navbar-logo.html template
 # html_logo = "_static/esa.jpg"
-html_title = "s2-msi-processor"
+html_title = "msi-processor"
 html_sidebars = {
     "**": [
         "navbar-logo.html",
@@ -140,7 +140,7 @@ nb_custom_formats = {
 # Sphinx apidoc
 autodoc_typehints = "signature"
 
-apidoc_module_dir = "../s2_msi_processor"
+apidoc_module_dir = "../msi_processor"
 apidoc_output_dir = "api"
 apidoc_module_first = True
 apidoc_toc_file = False

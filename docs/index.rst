@@ -12,11 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-.. s2-msi-processor documentation master file.
+.. msi-processor documentation master file.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to the s2-msi-processor documentation!
+Welcome to the msi-processor documentation!
 ===================================================
 
 .. toctree::
@@ -26,7 +26,7 @@ Welcome to the s2-msi-processor documentation!
    CSC DPR Reference Web Site <https://eopf.copernicus.eu/>
    sim
    sum/index
-   API Reference <api/s2_msi_processor>
+   API Reference <api/msi_processor>
    Terms and Abbreviations <https://eopf.copernicus.eu/eopf-user-manuals-and-guidelines-for-the-processor-developers/>
    srn
    contributing

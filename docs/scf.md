@@ -19,7 +19,7 @@
 ## Introduction
 
 This page constitutes the Software configuration file (SCF) for the
-s2-msi-processor project, describing the
+msi-processor project, describing the
 contents of the software configuration item.
 
 ## Software configuration item overview

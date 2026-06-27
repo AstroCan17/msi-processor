@@ -20,9 +20,9 @@ from eopf.product.conveniences import init_product
 
 # You might have to reformat the imports depending on the length
 # of the package name that is given when generating your project.
-from s2_msi_processor.computing.my_processor import MyProcessor
-from s2_msi_processor.exceptions.errors import MyError
-from s2_msi_processor.exceptions.warnings import MyWarning
+from msi_processor.computing.my_processor import MyProcessor
+from msi_processor.exceptions.errors import MyError
+from msi_processor.exceptions.warnings import MyWarning
 
 
 class MyProcessorTest(unittest.TestCase):
