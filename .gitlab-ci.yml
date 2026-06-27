@@ -88,11 +88,16 @@ linter:
 
 docker-linter:
   stage: unit tests
-  image: hadolint/hadolint:latest-debian
+  # the hadolint binary is fetched in-job (Studio shell runner ignores `image:`).
+  # When the SDE Kubernetes runner lands this can revert to `image: hadolint/hadolint:latest-debian`.
+  before_script:
+    - HADOLINT_VERSION=2.12.0
+    - curl -sfL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o hadolint
+    - chmod +x hadolint
   script:
     - mkdir -p ${REPORTS}
     - CHECKSUM=`md5sum Dockerfile | cut -d" " -f1`
-    - hadolint --config .hadolint.yml --format gitlab_codeclimate Dockerfile > ${REPORTS}/hadolint-${CHECKSUM}.json
+    - ./hadolint --config .hadolint.yml --format gitlab_codeclimate Dockerfile > ${REPORTS}/hadolint-${CHECKSUM}.json
   artifacts:
     name: "$CI_JOB_NAME artifacts from $CI_PROJECT_NAME on $CI_COMMIT_REF_SLUG"
     expire_in: 1 day

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """s2-msi-processor Python module"""
+
 __version__ = "0.0.1"
 
 """

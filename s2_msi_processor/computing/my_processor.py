@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import warnings
+from collections.abc import Mapping
 from typing import Any, Optional
 
 from eopf.computing.abstract import ADF, DataType, EOProcessingUnit
@@ -36,10 +37,11 @@ class MyProcessor(EOProcessingUnit):
 
     def run(
         self,
-        inputs: dict[str, DataType],
-        adfs: Optional[dict[str, ADF]] = None,
+        inputs: Mapping[str, DataType],
+        adfs: Optional[Mapping[str, ADF]] = None,
+        mode: Optional[str] = None,
         **kwargs: Any,
-    ) -> dict[str, DataType]:
+    ) -> Mapping[str, DataType]:
         """Runs the processor.
 
         Parameters
