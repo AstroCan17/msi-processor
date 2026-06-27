@@ -1,0 +1,79 @@
+# Copyright 2026 ESA
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "s2_msi_processor"
+authors = [{name = "AstroCan17"}]
+dynamic = ["version", "description"]
+readme = "README.md"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+    "Typing :: Typed",
+    "Private :: Do Not Upload",
+]
+requires-python = ">=3.11"
+
+# EOPF CPM is pinned to a fixed version for a stable build environment,
+# matching the version available in the SDE cpm-build-environment image
+# (same pin as the eopf-ml/eo-data-embedding project on this SDE).
+dependencies = [
+    "eopf == 2.8.1",
+]
+license = {file = "LICENSE"}
+
+[project.optional-dependencies]
+cluster-plugin = ["eopf[cluster-plugin] >= 1.5.0"]
+tests = ["eopf[tests] >= 1.5.0"]
+linter = ["eopf[linter] >= 1.5.0"]
+typing = ["eopf[typing] >= 1.5.0"]
+formatter = ["eopf[formatter] >= 1.5.0"]
+security = ["eopf[security] >= 1.5.0"]
+notebook = ["eopf[notebook] >= 1.5.0"]
+doc = [
+    "eopf[doc] >= 1.5.0",
+    # Align the versions with the ones from the 'python-build-environment' project.
+    "sphinxcontrib-mermaid == 0.8.1",
+    # Dependency required to be present for sphinx-test-reports to work,
+    # even though never used. The extension will actually not work as it
+    # requires PlantUML to be installed, which is a Java library.
+    "sphinxcontrib-plantuml == 0.25",
+    "sphinxcontrib-spelling == 8.0.0",
+    "sphinx-test-reports == 1.0.2",
+]
+complexity = ["eopf[complexity] >= 1.5.0"]
+doc-cov = ["eopf[doc-cov] >= 1.5.0"]
+dev = ["eopf[dev] >= 1.5.0"]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+
+[tool.pytest.ini_options]
+markers = [
+    "integration",
+    "unit",
+    "need_files",
+]
