@@ -31,7 +31,7 @@ End-to-end L0 → L2 processing chain. 🟢 implemented (CI-green) · ⬜ planne
 flowchart TD
     RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>L0 → L1A"]:::todo
     L0 --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>L1A"]:::done
-    RAD --> ENH["enhancement (opt)<br/>denoise · sharpen<br/>L1B"]:::todo
+    RAD --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)<br/>L1B"]:::todo
     ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::todo
     TOA --> COR["coregister<br/>band co-registration<br/>L1C"]:::todo
     COR --> GEO["georeference<br/>ortho · GCP · orbit<br/>L1C"]:::todo

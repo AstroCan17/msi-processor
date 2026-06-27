@@ -194,7 +194,7 @@ flowchart LR
 | Transition | Product produced | Modules | SRS reqs |
 |---|---|---|---|
 | `L0c → L1A` | `L1A` — reformatted, geo-annotated detector samples in focal-plane geometry, radiometrically uncorrected | `DPM-M-L0` | REQ-F-L0-* |
-| `L1A → L1B` | `L1B` — at-sensor TOA radiance (and optional TOA reflectance) in instrument geometry | `DPM-M-RAD`, `DPM-M-ENH` *(opt)*, `DPM-M-TOA` | REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-* |
+| `L1A → L1B` | `L1B` — at-sensor TOA radiance (and optional TOA reflectance) in instrument geometry | `DPM-M-RAD`, `DPM-M-ENH`, `DPM-M-TOA` | REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-* |
 | `L1B → L1C` | `L1C` — orthorectified TOA reflectance on the profile cartographic grid, band-co-registered (optionally pan-sharpened) | `DPM-M-COR`, `DPM-M-GEO`, `DPM-M-PAN` *(opt)* | REQ-F-COR-*, REQ-F-GEO-*, REQ-F-PAN-* |
 | `L1C → L2A` | `L2A` — BOA surface reflectance + scene classification + cloud/cloud-shadow masks | `DPM-M-ATM` | REQ-F-ATM-* |
 | all levels | QA flags & metrics, Zarr product, provenance, orchestration | `DPM-M-QA`, `DPM-M-PRD` | REQ-F-QA-*, REQ-F-PRD-*, REQ-F-ORC-* |
@@ -202,6 +202,12 @@ flowchart LR
 > **Level vs. module.** `L1B` is reached only after `DPM-M-TOA`; `DPM-M-RAD`/`DPM-M-ENH` outputs are
 > *intra-level* intermediate products usable as optional breakpoints (clause <9>). `L1A`, `L1B`,
 > `L1C`, `L2A` are the **mandatory level products** persisted as Zarr `EOProduct`s.
+>
+> **Change note (CR).** Enhancement (`DPM-M-ENH`) is **promoted to mandatory**: its sharpening
+> sub-step is **MTF Compensation (MTFC) via PSF deconvolution**, a critical Level-1 image-quality
+> restoration step that recovers high-spatial-frequency content attenuated by the instrument MTF. The
+> stage always runs (MTFC mandatory); denoise remains a sensor-profile-configurable sub-step.
+> Pan-sharpening (`DPM-M-PAN`) is unchanged (still optional).
 
 ### <6.2> Module decomposition and data flow
 
@@ -209,7 +215,7 @@ flowchart LR
 flowchart TD
   L0c[/L0c RAW + telemetry/] --> M0[DPM-M-L0 decode + ingest]
   M0 -->|L1A| MR[DPM-M-RAD dark/NUC/PRNU/BPR]
-  MR --> ME[DPM-M-ENH denoise/sharpen  opt]
+  MR --> ME[DPM-M-ENH denoise + MTFC/PSF deconvolution]
   ME --> MT[DPM-M-TOA DN→radiance/reflectance]
   MT -->|L1B| MC[DPM-M-COR inter-band co-registration]
   MC --> MG[DPM-M-GEO georef + ortho + resample]
@@ -227,7 +233,7 @@ flowchart TD
 |---|---|---|---|---|
 | `DPM-M-L0` | L0 decode & ingestion | REQ-F-L0-01..05 | `level_0.py` `Decoder.decode`, `lost_package` | no |
 | `DPM-M-RAD` | Radiometric correction (dark / NUC-PRNU / BPR) | REQ-F-RAD-01..05 | `level_1.py` `NUC.compute_nuc`, `apply_nuc_and_bpr`, `dark_noise_removal`, `noise_remover` | no |
-| `DPM-M-ENH` | Image-quality enhancement (denoise / sharpen) | REQ-F-ENH-01..03 | `level_1.py` `Denoiser.*`, `sharpening.deconvolution_kernel` | **yes** |
+| `DPM-M-ENH` | Image-quality enhancement (denoise + MTF compensation) | REQ-F-ENH-01..03 | `level_1.py` `Denoiser.*`, `sharpening.deconvolution_kernel` (MTFC/PSF deconvolution) | no |
 | `DPM-M-TOA` | TOA radiance & reflectance | REQ-F-TOA-01..03 | `level_1.py` `TOA.dn_to_radiance`, `get_ESUN`, `get_sun_el_esdist`, `toa_rad_to_ref` | TOA-ref opt |
 | `DPM-M-COR` | Inter-band co-registration | REQ-F-COR-01..03 | `band_coreg.py` `BandRegister.shifting_sift` | no |
 | `DPM-M-GEO` | Geo-referencing / orthorectification | REQ-F-GEO-01..04 | `georeferencing_v1.py` `getSatelliteInfo`, `geoReferencing`, `reprojection` | no |
@@ -272,7 +278,7 @@ acquisition, and read-only (IRD REQ-IF-IN-ADF-01..04; SRS REQ-S-01). Concrete sc
 |---|---|---|---|---|---|
 | `DPM-PR-L1A` | Decoded, geo-annotated detector samples (uncorrected DN) | focal-plane | `DPM-M-L0` | **yes** (level) | `DPM-BKP-L1A` |
 | `DPM-PR-NUC` | NUC/BPR-corrected detector array (DN) | focal-plane | `DPM-M-RAD` | optional | `DPM-BKP-RAD` |
-| `DPM-PR-ENH` | Enhanced (denoised/sharpened) array | focal-plane | `DPM-M-ENH` | optional | `DPM-BKP-ENH` |
+| `DPM-PR-ENH` | Enhanced (denoised + MTF-compensated) array | focal-plane | `DPM-M-ENH` | optional | `DPM-BKP-ENH` |
 | `DPM-PR-L1B` | TOA radiance (+ optional TOA reflectance) | instrument | `DPM-M-TOA` | **yes** (level) | `DPM-BKP-L1B` |
 | `DPM-PR-COR` | Band-co-registered stack | instrument | `DPM-M-COR` | optional | `DPM-BKP-COR` |
 | `DPM-PR-L1C` | Orthorectified TOA reflectance on cartographic grid (optionally pan-sharpened) | map (CRS) | `DPM-M-GEO` (+ `DPM-M-PAN`) | **yes** (level) | `DPM-BKP-L1C` |
@@ -299,11 +305,11 @@ heritage code (RD-7) and are profile-overridable; instrument-calibration constan
 | `DPM-PRM-RAD-02` | RAD | BPR thresholds `min_val`/`max_val` on gain | profile / ADF | enables bad-pixel detection |
 | `DPM-PRM-RAD-03` | RAD | Dark/FPN removal enable (`remove_noise`) + FFT dark subtraction enable | profile | off by default |
 | `DPM-PRM-RAD-04` | RAD | Dark cut rows (`cut_dark`/`cut_flat`), PAN factor ×2 | profile | calibration-frame trim |
-| `DPM-PRM-ENH-01` | ENH | Denoise method selection | profile | one of: Butterworth LP, wavelet VisuShrink, PCA, moving-average, Gaussian, FFT dark-noise |
+| `DPM-PRM-ENH-01` | ENH | Denoise method selection (sub-step configurable; may be off) | profile | one of: Butterworth LP, wavelet VisuShrink, PCA, moving-average, Gaussian, FFT dark-noise; or disabled |
 | `DPM-PRM-ENH-02` | ENH | Butterworth: `cutoff`, `order`, `squared_butterworth`, `npad` | profile | `cutoff=0.2`, `order=10`, `squared=False`, `npad=0` |
 | `DPM-PRM-ENH-03` | ENH | Gaussian: kernel size, σ | profile / derived | `5×5`, σ = image std |
 | `DPM-PRM-ENH-04` | ENH | PCA components; moving-average window `N` | profile | `N=60` (heritage) |
-| `DPM-PRM-ENH-05` | ENH | Sharpening deconvolution kernel(s) (MS + larger PAN kernel) | profile | per-band kernel |
+| `DPM-PRM-ENH-05` | ENH | MTF compensation (MTFC): PSF deconvolution kernel(s) (MS + larger PAN kernel) — **mandatory** | profile | per-band kernel from instrument MTF/PSF characterisation |
 | `DPM-PRM-TOA-01` | TOA | ESUN `E_b` per band | ADF (`DPM-ADF-SPEC`) | private |
 | `DPM-PRM-TOA-02` | TOA | Illumination-geometry source (`θ_s`, `d_es`) | derived (telemetry/TLE) / profile | from acquisition geometry |
 | `DPM-PRM-TOA-03` | TOA | Emit TOA reflectance (on/off) | profile | optional |
@@ -416,22 +422,29 @@ to the declared dynamic range (REQ-F-RAD-04, REQ-D-05).
 
 ---
 
-### <8.3> DPM-M-ENH — Image-quality enhancement (denoise / sharpen) *(optional)*
+### <8.3> DPM-M-ENH — Image-quality enhancement (denoise + MTF compensation) *(mandatory)*
 
-**Overview / role.** Optionally suppress noise and restore resolution without compromising
-radiometric integrity. Disabled by default where not validated for the active sensor; its radiometric
-impact is reported via QA metrics. (Heritage: `level_1.py` `Denoiser` — Butterworth LP, wavelet
-VisuShrink, PCA, moving-average, Gaussian, FFT dark-noise — and `sharpening.deconvolution_kernel`.)
+**Overview / role.** Restore Level-1 image quality without compromising radiometric integrity. This
+stage is **mandatory** because it performs **MTF Compensation (MTFC)** — a critical Level-1
+image-quality restoration step implemented as **PSF deconvolution** — which recovers the
+high-spatial-frequency content attenuated by the instrument Modulation Transfer Function (combined
+optics + detector footprint + platform-motion smear). MTFC materially affects both the spatial
+sharpness and the radiometric/spatial fidelity of every Level-1 (and downstream) product, so the
+stage **always runs**. Denoising is a **sensor-profile-configurable** sub-step applied before MTFC
+(to avoid amplifying noise during deconvolution); its method — and whether it is active — is set by
+the active profile. The radiometric impact of the stage is reported via QA metrics. (Heritage:
+`level_1.py` `Denoiser` — Butterworth LP, wavelet VisuShrink, PCA, moving-average, Gaussian, FFT
+dark-noise — for the denoise sub-step, and `sharpening.deconvolution_kernel` reused as the MTFC/PSF
+deconvolution kernel.)
 
 **Logical flow.**
 ```mermaid
 flowchart TD
-  nuc[/DPM-PR-NUC/] --> sel{Denoise method?}
-  sel --> dn[Apply selected denoiser]
-  dn --> sh{Sharpen enabled?}
-  sh -- yes --> dk[Deconvolution-kernel convolution]
-  sh -- no --> clip
-  dk --> clip[Clip to valid range]
+  nuc[/DPM-PR-NUC/] --> sel{Denoise enabled? (profile)}
+  sel -- yes --> dn[Apply selected denoiser]
+  sel -- no --> mtfc
+  dn --> mtfc[MTF compensation: PSF deconvolution — mandatory]
+  mtfc --> clip[Clip to valid range]
   clip --> qa[QA metric impact vs input]
   qa --> out[/DPM-PR-ENH/]
 ```
@@ -448,12 +461,17 @@ flowchart TD
 - **PCA**: project the band stack onto the leading components and reconstruct (denoise by truncation).
 - **Wavelet VisuShrink**: soft-threshold the wavelet coefficients at the universal threshold.
 - **FFT dark-noise removal**: as in <8.2> (shared kernel).
-- **Sharpening**: `out = filter2D(value, kernel)`, with a distinct (larger) kernel for the
-  panchromatic band, then `clip(out, 0, 2¹²−1)`.
+- **MTF compensation (PSF deconvolution)** *(mandatory)*: recover the high-spatial-frequency content
+  attenuated by the instrument MTF by deconvolving the per-band point-spread function. The heritage
+  realisation applies a restoration kernel `out = filter2D(value, kernel)` (the MTFC/PSF-deconvolution
+  kernel), with a distinct (larger) kernel for the panchromatic band, then `clip(out, 0, 2¹²−1)`. The
+  kernel set is a profile constant derived from the instrument MTF/PSF characterisation; the rigorous
+  deconvolution formulation is the ATBD basis (RD-3).
 
-**Outputs.** `DPM-PR-ENH` (enhanced band(s), clipped) + QA metric deltas.
-**Exception handling.** Each sub-stage is independently toggleable; defaults to disabled where not
-validated (REQ-F-ENH-03); outputs always clipped to the valid range.
+**Outputs.** `DPM-PR-ENH` (denoised + MTF-compensated band(s), clipped) + QA metric deltas.
+**Exception handling.** The stage is **mandatory** and always runs because MTFC is non-optional; the
+denoise sub-step is sensor-profile-configurable (its method may be selected or left inactive per the
+active profile, REQ-F-ENH-03); outputs are always clipped to the valid range.
 **Trace.** REQ-F-ENH-01..03; SYS-CAP-02, SYS-ADP-01, SYS-QUA-04.
 
 ---
@@ -720,7 +738,7 @@ calibration support and reprocessing (SRS REQ-F-ORC-01, REQ-REL-02; IRD REQ-IF-C
 | Breakpoint id | After module | Product dumped | Level | Default | Resume target |
 |---|---|---|---|---|---|
 | `DPM-BKP-L1A` | `DPM-M-L0` | `DPM-PR-L1A` | `L1A` | **on** (level) | `DPM-M-RAD` |
-| `DPM-BKP-RAD` | `DPM-M-RAD` | `DPM-PR-NUC` | intra-`L1B` | off | `DPM-M-ENH`/`DPM-M-TOA` |
+| `DPM-BKP-RAD` | `DPM-M-RAD` | `DPM-PR-NUC` | intra-`L1B` | off | `DPM-M-ENH` |
 | `DPM-BKP-ENH` | `DPM-M-ENH` | `DPM-PR-ENH` | intra-`L1B` | off | `DPM-M-TOA` |
 | `DPM-BKP-L1B` | `DPM-M-TOA` | `DPM-PR-L1B` | `L1B` | **on** (level) | `DPM-M-COR` |
 | `DPM-BKP-COR` | `DPM-M-COR` | `DPM-PR-COR` | intra-`L1C` | off | `DPM-M-GEO` |
@@ -730,9 +748,10 @@ calibration support and reprocessing (SRS REQ-F-ORC-01, REQ-REL-02; IRD REQ-IF-C
 **Resume semantics.** Resuming from a breakpoint reads the persisted product (by URI) as the module
 input and re-runs the downstream sub-chain with the same profile and ADF set; because the chain is
 deterministic (REQ-F-DEP-02), a resumed run reproduces the equivalent full-chain output (bit-identical
-where the algorithm is deterministic, otherwise within the documented tolerance). Optional enhancement
-(`DPM-M-ENH`) and pan-sharpening (`DPM-M-PAN`) breakpoints are absent from the path when those modules
-are disabled by the profile.
+where the algorithm is deterministic, otherwise within the documented tolerance). Enhancement
+(`DPM-M-ENH`) is mandatory and always runs, so its breakpoint is always available as a dump point; the
+optional pan-sharpening (`DPM-M-PAN`) breakpoint is absent from the path when that module is disabled
+by the profile.
 
 ---
 
