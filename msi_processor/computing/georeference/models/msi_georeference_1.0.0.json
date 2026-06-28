@@ -1,0 +1,31 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "cor": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "viewing_model": {"min_occurs": 1, "spec": {"required": true}},
+        "dem": {"min_occurs": 1, "spec": {"required": true}},
+        "gcp": {"min_occurs": 0, "spec": {"required": false}}
+      },
+      "outputs": {
+        "l1c": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "resolution": {"required": true},
+        "crs": {"required": false},
+        "resampling": {"required": false},
+        "use_gcp": {"required": false},
+        "min_gcp": {"required": false},
+        "match_fraction": {"required": false},
+        "ransac_tau": {"required": false},
+        "min_keypoints": {"required": false},
+        "seed": {"required": false},
+        "gcp_reference_band": {"required": false}
+      }
+    }
+  }
+}

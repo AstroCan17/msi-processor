@@ -31,10 +31,10 @@ End-to-end L0 → L2 processing chain. 🟢 implemented (CI-green) · ⬜ planne
 flowchart TD
     RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>L0 → L1A"]:::todo
     L0 --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>L1A"]:::done
-    RAD --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)<br/>L1B"]:::todo
-    ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::todo
-    TOA --> COR["coregister<br/>band co-registration<br/>L1C"]:::todo
-    COR --> GEO["georeference<br/>ortho · GCP · orbit<br/>L1C"]:::todo
+    RAD --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)<br/>L1B"]:::done
+    ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::done
+    TOA --> COR["coregister<br/>band co-registration<br/>L1B→L1C"]:::done
+    COR --> GEO["georeference<br/>GCP · grid resampling · ortho<br/>L1C"]:::done
     GEO --> PAN["pansharpen (opt)<br/>L1C"]:::todo
     PAN --> ATM["atmospheric — NEW<br/>BOA reflectance<br/>L2A"]:::todo
     ATM --> PRD[/"L2 Zarr products"/]
@@ -45,11 +45,14 @@ flowchart TD
     classDef todo fill:#3f3f3f,color:#eee,stroke:#222;
 ```
 
-**Implemented:** the foundation (common types/metrics, exception hierarchy, sensor profile)
-and the `radiometric` processing unit (NUC / dark / bad-pixel repair / saturation), with
-synthetic unit tests.
-**Planned:** `l0_decode`, `enhancement`, `toa`, `coregister`, `georeference`, `pansharpen`,
-`atmospheric` (Level-2).
+**Implemented (CI-green):** the foundation (common types/metrics, exception hierarchy, sensor
+profile) and the `radiometric` (NUC / dark / BPR / saturation), `enhancement` (MTF compensation /
+PSF deconvolution + configurable denoise), `toa` (DN → radiance → reflectance), `coregister`
+(SIFT + homography) and `georeference` (GCP refinement + cartographic-grid resampling) processing
+units — the **L0c → L1C** chain — each with synthetic unit tests. The rigorous viewing-model / DEM
+orthorectification is a private `[impl]` interface.
+**Planned:** `atmospheric` (Level-2 BOA surface reflectance, new), `pansharpen` (optional), and
+`l0_decode` (L0 decode; the proprietary codec body stays a private `[impl]`).
 
 **ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the
 baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …).
