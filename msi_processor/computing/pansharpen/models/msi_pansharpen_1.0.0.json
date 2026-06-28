@@ -1,0 +1,29 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "l2a": {"type": "product", "spec": {}}
+      },
+      "adfs": {},
+      "outputs": {
+        "pan": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "enabled": {"required": false},
+        "method": {"required": false, "enum": ["simple_mean", "brovey", "gs", "ihs", "atrous"]},
+        "pan_band": {"required": false},
+        "fidelity_budget": {"required": false},
+        "ransac_tau": {"required": false},
+        "clahe_clip": {"required": false},
+        "clahe_grid": {"required": false},
+        "match_fraction": {"required": false},
+        "min_keypoints": {"required": false},
+        "min_keypoints_pan": {"required": false},
+        "max_residual": {"required": false},
+        "seed": {"required": false}
+      }
+    }
+  }
+}
