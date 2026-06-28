@@ -1,0 +1,30 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "l1c": {"type": "product", "spec": {}}
+      },
+      "adfs": {
+        "atmospheric": {"min_occurs": 0, "spec": {"required": false}},
+        "dem": {"min_occurs": 1, "spec": {"required": true}}
+      },
+      "outputs": {
+        "l2a": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "param_mode": {"required": false, "enum": ["ingest", "retrieve"]},
+        "sun_zenith": {"required": false},
+        "view_zenith": {"required": false},
+        "relative_azimuth": {"required": false},
+        "band_roles": {"required": false},
+        "cloud_brightness": {"required": false},
+        "shadow_nir": {"required": false},
+        "shadow_brightness": {"required": false},
+        "ndvi_veg": {"required": false},
+        "ndwi_water": {"required": false}
+      }
+    }
+  }
+}
