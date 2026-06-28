@@ -38,6 +38,7 @@ __all__ = [
     "CoregistrationError",
     "GeolocationError",
     "AtmosphericError",
+    "PansharpenError",
     "ProductWriteError",
 ]
 
@@ -107,6 +108,10 @@ class GeolocationError(MsiProcessorError):
 
 class AtmosphericError(MsiProcessorError):
     """Atmospheric-correction failure (REQ-F-ATM-*)."""
+
+
+class PansharpenError(MsiProcessorError):
+    """Pan-sharpening failure / unimplemented fusion method (REQ-F-PAN-*)."""
 
 
 class ProductWriteError(MsiProcessorError):
