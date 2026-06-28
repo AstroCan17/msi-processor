@@ -81,7 +81,7 @@ The following tools are used by this project:
   * flake8: Python code linter.
   * xenon: Complexity monitor.
   * Sonarqube: Quality check.
-  * trivy: Scanner for vulnerabilities.
+  * pip-audit: Dependency vulnerability (CVE) scanner.
   * sphinx: Document generation.
 * `pre-commit-config.yaml`: Pre-commit hooks executed on commits.
 * `pyproject.toml`: Build system requirements for Python.
