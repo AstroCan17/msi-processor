@@ -41,9 +41,17 @@ requires-python = ">=3.11"
 # stages (SIFT / FLANN / RANSAC / warpPerspective; ATBD <5.6>, SDD <5.4.6>).
 # The headless wheel is used as the target and CI runtimes have no display; it
 # ships PEP 561 type stubs, so mypy resolves ``cv2`` natively.
+#
+# rasterio (with its bundled ``affine``) is the maintained GDAL/PROJ Python
+# binding used by the georeference stage for the cartographic affine geotransform
+# + reprojection (ALG-GEO-RESAMP; ATBD <5.7>, SDD <5.4.7>). It is already an eopf
+# transitive dependency; it is declared explicitly here as it is imported
+# directly. Neither wheel ships PEP 561 stubs, so mypy ignores those imports
+# (see ``.mypy.ini``).
 dependencies = [
     "eopf == 2.8.1",
     "opencv-python-headless >= 4.8",
+    "rasterio >= 1.3",
 ]
 license = {file = "LICENSE"}
 
