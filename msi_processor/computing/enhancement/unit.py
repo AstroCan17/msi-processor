@@ -222,14 +222,19 @@ class EnhancementUnit(EOProcessingUnit):
     @staticmethod
     def _build_params(kwargs: Mapping[str, Any]) -> EnhancementParams:
         """Build :class:`EnhancementParams` from the run kwargs (with defaults)."""
-        method = str(kwargs.get("denoise_method", "none"))
-        if method not in _ALLOWED_DENOISE:
+        method_raw = str(kwargs.get("denoise_method", "none"))
+        method: Optional[DenoiseMethod] = None
+        for allowed in _ALLOWED_DENOISE:
+            if method_raw == allowed:
+                method = allowed  # narrows to the DenoiseMethod literal (no cast needed)
+                break
+        if method is None:
             raise InputValidationError(
-                f"Unknown denoise method '{method}'; expected one of {_ALLOWED_DENOISE}",
+                f"Unknown denoise method '{method_raw}'; expected one of {_ALLOWED_DENOISE}",
                 stage="enhancement",
             )
         return EnhancementParams(
-            denoise_method=cast(DenoiseMethod, method),
+            denoise_method=method,
             denoise_params=dict(kwargs.get("denoise_params", {})),
             bit_depth=int(kwargs.get("bit_depth", 12)),
             fill_value=kwargs.get("fill_value"),
