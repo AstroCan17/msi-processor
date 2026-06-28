@@ -180,16 +180,35 @@ security:
 
 deps-sec:
   stage: unit tests
-  image:
-    name: aquasec/trivy:0.36.0
-    entrypoint: [""]
-  needs: [security]
-  dependencies:
-    - security
+  # Dependency CVE scan. Shell-executor compatible (the previous trivy job
+  # declared `image: aquasec/trivy` but the registered runner is a *shell*
+  # executor, which ignores `image:` -> "trivy: command not found" -> the job was
+  # a non-blocking no-op). pip-audit is run in an isolated venv against the
+  # project's OWN dependency closure (eopf + first-party adds), not the shared
+  # runner environment, so the result is relevant and controllable -- and thus a
+  # blocking gate.
+  before_script:
+    - python -m venv .audit-venv
+    - .audit-venv/bin/pip install --quiet --upgrade pip setuptools pip-audit
+    - .audit-venv/bin/pip install --quiet .
+    # Freeze the resolved closure (excluding the first-party package, which is not
+    # on PyPI) as the scan target.
+    - .audit-venv/bin/pip freeze | grep -ivE '^msi[-_]processor' > audit-requirements.txt
   script:
-    # Report for user
-    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ./
-  allow_failure: true
+    # Accepted, currently-unfixable exceptions: transitive via the pinned
+    # `eopf == 2.8.1` SDE stack, which must not be bumped without diverging from
+    # the SDE build image. Revisit whenever the eopf pin is raised.
+    #   starlette 1.0.1 -> PYSEC-2026-248/249, CVE-2026-48817/48818 (fix >= 1.1.0)
+    - >-
+      .audit-venv/bin/pip-audit -r audit-requirements.txt --desc on
+      --ignore-vuln PYSEC-2026-248
+      --ignore-vuln PYSEC-2026-249
+      --ignore-vuln CVE-2026-48817
+      --ignore-vuln CVE-2026-48818
+  artifacts:
+    expire_in: 1h
+    paths:
+      - audit-requirements.txt
 
 docs-cov:
   stage: unit tests
