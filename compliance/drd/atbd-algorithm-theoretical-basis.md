@@ -55,7 +55,7 @@ The ATBD covers the ten algorithmic subjects realised in the chain:
 | 6 | Inter-band co-registration (<5.6>) | `L1B →` | REQ-F-COR-* |
 | 7 | Geo-referencing / orthorectification (<5.7>) | `→ L1C` | REQ-F-GEO-* |
 | 8 | Atmospheric correction (<5.8>) — **new / TBD** | `L1C → L2A` | REQ-F-ATM-* |
-| 9 | Pan-sharpening (<5.9>) | within `L1B→L1C` | REQ-F-PAN-* |
+| 9 | Pan-sharpening (<5.9>) — optional terminal L2 derivative | after `L2A` (post atmospheric correction) | REQ-F-PAN-* |
 | 10 | QA metrics (<5.10>) | all levels | REQ-F-QA-* |
 
 It does **not** re-specify software requirements (SRS, RD-1), interfaces (ICD/IRD), or the per-sensor
@@ -115,12 +115,21 @@ algorithmic core (REQ-D-03). The chain and its level breakpoints:
 
 ```
 L0c ──[decode/loss/assemble]──► L1A ──[dark/PRNU/BPR ▸ (denoise) ▸ MTFC ▸ DN→TOA]──► L1B
-    ──[band co-reg ▸ georef/ortho ▸ (pan-sharpen)]──► L1C ──[atm. correction ▸ scene class/masks]──► L2A
+    ──[band co-reg ▸ georef/ortho]──► L1C ──[atm. correction ▸ scene class/masks]──► L2A
+    ──[(pan-sharpen)]──► pan-sharpened L2A derivative (optional, terminal)
 ```
 
 Stages in parentheses are profile-toggleable: **denoise** (<5.4>) is sensor-profile-configurable and
-**pan-sharpen** (<5.9>) is optional. **MTF compensation (MTFC / PSF deconvolution, <5.5>) is a mandatory
-Level-1 image-quality step and always runs**, so the enhancement stage is mandatory. The chain is
+**pan-sharpen** (<5.9>) is optional and **default-off**. **MTF compensation (MTFC / PSF deconvolution,
+<5.5>) is a mandatory Level-1 image-quality step and always runs**, so the enhancement stage is
+mandatory. **Pan-sharpening is now a terminal, optional post-L2A derivative that runs *after*
+atmospheric correction** (it is no longer part of the `L1B→L1C` transition): pan-sharpening trades
+spectral/radiometric fidelity for spatial sharpness, so it is a visual/derivative product rather than a
+science-grade input to quantitative retrieval, and atmospheric correction must precede fusion so that
+fusion operates on physically-meaningful BOA (surface) reflectance rather than TOA values (empirical
+guidance: Lin et al. 2015, WorldView-2 AC × pan-sharpen study). **Change note (CR-4):** pan-sharpen
+moved from the `L1B→L1C` transition to a terminal post-L2A derivative; `L1C` carries no pan-sharpening.
+The chain is
 sensor-agnostic: every instrument constant — band set and centre wavelengths, detector/focal-plane
 geometry, calibration-ADF bindings, ESUN, viewing model, output CRS/grid, filter parameters — is
 supplied by the active profile (REQ-AD-01), never hard-coded in the core (REQ-D-04).
@@ -730,16 +739,40 @@ specified interface with a candidate algorithm.
 
 ---
 
-### <5.9> Pan-sharpening
+### <5.9> Pan-sharpening — optional, terminal post-L2A derivative
 
-**Purpose.** Fuse the co-registered multispectral bands with the higher-resolution panchromatic (PAN)
-band to produce a high-resolution multispectral product; optional. (Heritage: `pansharp.py`
-`PanSharpening.pan_sharpen` — SIFT/FLANN/RANSAC alignment + simple-mean fusion.)
+> **Change note (CR-4):** pan-sharpening is **relocated** from the `L1B→L1C` transition to an
+> **optional, default-off, terminal post-L2A derivative step that runs *after* atmospheric correction**
+> (<5.8>). It is a visual/derivative product, **not** a science-grade input to quantitative
+> retrieval/indices; `L1C` carries no pan-sharpening. All identifiers are unchanged (`ALG-PAN-*`,
+> `REQ-F-PAN-*`, `DPM-M-PAN`, `C-PU-PAN`).
+
+**Purpose.** Fuse the atmospherically-corrected (BOA) multispectral bands of the `L2A` product with the
+higher-resolution panchromatic (PAN) band to produce a high-resolution, pan-sharpened **L2A derivative**
+product; **optional and default-off**, enabled only where validated for the sensor. (Heritage:
+`pansharp.py` `PanSharpening.pan_sharpen` — SIFT/FLANN/RANSAC alignment + simple-mean fusion.)
 
 **Theoretical background.** A PAN band offers higher spatial resolution but no spectral discrimination;
 the MS bands offer the reverse. Pan-sharpening injects PAN spatial detail into each up-sampled MS band
 while aiming to preserve spectral fidelity. The heritage uses a **simple-mean** fusion after geometric
 alignment of MS to PAN.
+
+**Rationale for placement after atmospheric correction.** Pan-sharpening **trades spectral/radiometric
+fidelity for spatial sharpness**: the fused output is sharper but no longer carries science-grade,
+physically-meaningful reflectance, so it is treated as a **visual/derivative product, not a quantitative
+input** to retrieval or spectral indices. Consequently, atmospheric correction (<5.8>) **must precede**
+fusion so that fusion operates on **BOA (surface) reflectance** rather than on TOA values; applying AC
+*after* sharpening would attempt a physical inversion on radiometrically-blended data (empirical
+guidance: Lin et al. 2015, WorldView-2 AC × pan-sharpen study). The order (**AC → pan-sharpen**) is
+therefore settled in this design.
+
+**Open design point (PAN-reflectance handling — to record, not resolve).** Rigorous AC is band-specific,
+and the broadband **PAN band is too spectrally broad for a well-defined atmospheric correction**.
+"After AC" therefore requires one of two handlings, deferred to an `[impl]`/profile choice in the DPM
+(RD-6): (a) produce a **BOA-PAN approximation** (e.g. a synthesised broadband BOA-PAN from the corrected
+MS bands or a dedicated broadband AC) and fuse BOA-MS with BOA-PAN; or (b) **fuse BOA-MS with TOA-PAN**,
+accepting a **TOA/BOA domain mismatch** that weakens component-substitution methods (Brovey / GS / PCA /
+IHS). The **order is settled**; the PAN-reflectance handling remains an open `[impl]`/profile decision.
 
 **Governing algorithm.**
 
@@ -756,15 +789,23 @@ $$
   clipped to $[0,2^{N_{\mathrm{bit}}}-1]$. (Higher-fidelity component-substitution / MRA methods —
   Brovey, GS, IHS, à-trous wavelet — are candidate profile options for better spectral preservation.)
 
-**Inputs.** Co-registered MS stack; PAN band; profile: enable flag, fusion method, alignment
-parameters.
+**Inputs.** `L2A` BOA-MS reflectance stack (from <5.8>); PAN band (TOA-PAN, or a BOA-PAN approximation —
+see the open design point above); profile: enable flag, fusion method, alignment parameters, PAN-
+reflectance handling.
 
-**Parameters.** Fusion method, alignment/RANSAC parameters, output dtype.
+**Parameters.** Fusion method, alignment/RANSAC parameters, PAN-reflectance handling (BOA-PAN approx vs
+TOA-PAN), output dtype.
 
-**Assumptions & limitations.** (i) Simple-mean fusion is spectrally lossy (it blends PAN radiometry
-into every band); spectral fidelity must meet the per-profile budget and is reported via QA (REQ-F-PAN-02)
-— if unmet, a spectral-preserving method is selected. (ii) Requires accurate MS↔PAN registration; poor
-alignment produces edge artefacts. (iii) Optional and default-off unless validated for the sensor.
+**Assumptions & limitations.** (i) Pan-sharpening is a **terminal, optional, default-off post-L2A
+derivative** that runs **after atmospheric correction** (<5.8>); its output is a visual/derivative
+product, **not** a science-grade input to quantitative retrieval/indices. (ii) Simple-mean fusion is
+spectrally lossy (it blends PAN radiometry into every band); spectral fidelity must meet the per-profile
+budget and is reported via QA (REQ-F-PAN-02) — if unmet, a spectral-preserving method is selected.
+(iii) Requires accurate MS↔PAN registration; poor alignment produces edge artefacts. (iv) Because the
+broadband PAN is too broad for a well-defined AC, fusing BOA-MS with TOA-PAN introduces a TOA/BOA domain
+mismatch that weakens component-substitution methods (Brovey / GS / PCA / IHS); the PAN-reflectance
+handling (BOA-PAN approximation vs TOA-PAN) is an open `[impl]`/profile choice (the AC → pan-sharpen
+order itself is settled).
 
 *Trace:* REQ-F-PAN-01..02, SYS-CAP-04.
 
@@ -874,6 +915,10 @@ the footprint and epoch (SSS A-2, A-5); reference/cal-val data available locally
    affine NUC.
 6. **Pan-sharpening fidelity (<5.9>)** — provide a spectral-preserving fusion option (Brovey / GS / IHS
    / à-trous) where simple-mean does not meet the spectral-fidelity budget.
+7. **PAN-reflectance handling for post-AC pan-sharpening (<5.9>, CR-4)** — the broadband PAN is too
+   broad for a well-defined AC, so "after AC" fusion needs either a **BOA-PAN approximation** or
+   **fusing BOA-MS with TOA-PAN** (a TOA/BOA domain mismatch); the AC → pan-sharpen *order* is settled,
+   the PAN-reflectance handling is an open `[impl]`/profile choice.
 
 ---
 
