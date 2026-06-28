@@ -35,9 +35,10 @@ flowchart TD
     ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::done
     TOA --> COR["coregister<br/>band co-registration<br/>L1B→L1C"]:::done
     COR --> GEO["georeference<br/>GCP · grid resampling · ortho<br/>L1C"]:::done
-    GEO --> PAN["pansharpen (opt)<br/>L1C"]:::todo
-    PAN --> ATM["atmospheric — NEW<br/>BOA reflectance<br/>L2A"]:::todo
+    GEO --> ATM["atmospheric — NEW<br/>BOA reflectance<br/>L2A"]:::todo
     ATM --> PRD[/"L2 Zarr products"/]
+    ATM --> PAN["pansharpen (opt) — post-L2A<br/>fused L2A derivative"]:::todo
+    PAN --> PRD
 
     FOUND["foundation · DONE<br/>common (types, metrics) · exceptions · sensors profile"]:::done
 
@@ -51,7 +52,8 @@ PSF deconvolution + configurable denoise), `toa` (DN → radiance → reflectanc
 (SIFT + homography) and `georeference` (GCP refinement + cartographic-grid resampling) processing
 units — the **L0c → L1C** chain — each with synthetic unit tests. The rigorous viewing-model / DEM
 orthorectification is a private `[impl]` interface.
-**Planned:** `atmospheric` (Level-2 BOA surface reflectance, new), `pansharpen` (optional), and
+**Planned:** `atmospheric` (Level-2 BOA surface reflectance, new), `pansharpen` (optional,
+**post-L2A** fused derivative — runs after atmospheric correction, not at L1C), and
 `l0_decode` (L0 decode; the proprietary codec body stays a private `[impl]`).
 
 **ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the

@@ -168,7 +168,7 @@ flowchart LR
   subgraph CHAIN[msi-processor — chain of EOPF CPM EOProcessingUnits]
     direction LR
     M0[DPM-M-L0] --> MR[DPM-M-RAD] --> ME[DPM-M-ENH] --> MT[DPM-M-TOA]
-    MT --> MC[DPM-M-COR] --> MG[DPM-M-GEO] --> MP[DPM-M-PAN] --> MA[DPM-M-ATM]
+    MT --> MC[DPM-M-COR] --> MG[DPM-M-GEO] --> MA[DPM-M-ATM] --> MP[DPM-M-PAN]
   end
   CHAIN -->|L1B/L1C/L2A Zarr EOProduct| STORE[(E5 Product store / archive)]
   CHAIN -. runs within .- HOST[(E6 EOPF CPM + EOZarrStore)]
@@ -198,8 +198,9 @@ flowchart LR
 |---|---|---|---|
 | `L0c → L1A` | `L1A` — reformatted, geo-annotated detector samples in focal-plane geometry, radiometrically uncorrected | `DPM-M-L0` | REQ-F-L0-* |
 | `L1A → L1B` | `L1B` — at-sensor TOA radiance (and optional TOA reflectance) in instrument geometry | `DPM-M-RAD`, `DPM-M-ENH`, `DPM-M-TOA` | REQ-F-RAD-*, REQ-F-ENH-*, REQ-F-TOA-* |
-| `L1B → L1C` | `L1C` — orthorectified TOA reflectance on the profile cartographic grid, band-co-registered (optionally pan-sharpened) | `DPM-M-COR`, `DPM-M-GEO`, `DPM-M-PAN` *(opt)* | REQ-F-COR-*, REQ-F-GEO-*, REQ-F-PAN-* |
+| `L1B → L1C` | `L1C` — orthorectified TOA reflectance on the profile cartographic grid, band-co-registered (**no pan-sharpening**) | `DPM-M-COR`, `DPM-M-GEO` | REQ-F-COR-*, REQ-F-GEO-* |
 | `L1C → L2A` | `L2A` — BOA surface reflectance + scene classification + cloud/cloud-shadow masks | `DPM-M-ATM` | REQ-F-ATM-* |
+| `L2A → L2A-derivative` *(opt, terminal)* | `L2A` pan-sharpened derivative — BOA reflectance spatially sharpened with the PAN band; a **visual/derivative** product, **not** science-grade input to quantitative retrieval/indices; **default-off** | `DPM-M-PAN` *(opt)* | REQ-F-PAN-* |
 | all levels | QA flags & metrics, Zarr product, provenance, orchestration | `DPM-M-QA`, `DPM-M-PRD` | REQ-F-QA-*, REQ-F-PRD-*, REQ-F-ORC-* |
 
 > **Normative basis (level taxonomy).** The processing-level framework `L0/L1A/L1B/L2` follows the
@@ -220,7 +221,17 @@ flowchart LR
 > sub-step is **MTF Compensation (MTFC) via PSF deconvolution**, a critical Level-1 image-quality
 > restoration step that recovers high-spatial-frequency content attenuated by the instrument MTF. The
 > stage always runs (MTFC mandatory); denoise remains a sensor-profile-configurable sub-step.
-> Pan-sharpening (`DPM-M-PAN`) is unchanged (still optional).
+>
+> **Change note (CR-4).** Pan-sharpening (`DPM-M-PAN`) is **moved out of the `L1B→L1C` transition**
+> (where it was part of L1C) to an **optional, default-off, terminal post-L2A derivative** step that
+> runs **after** atmospheric correction (`DPM-M-ATM`). Rationale: pan-sharpening trades
+> spectral/radiometric fidelity for spatial sharpness, so it is a **visual/derivative product, not
+> science-grade input** to quantitative retrieval/indices; and atmospheric correction must **precede**
+> fusion so it operates on physically-meaningful **BOA (surface) reflectance** rather than TOA values
+> (empirical guidance: Lin et al. 2015, WorldView-2 AC×pan-sharpen study). `L1C` is therefore
+> band-co-registered orthorectified **TOA reflectance with no pan-sharpening**. The **order**
+> (AC → pan-sharpen) is settled; the handling of **PAN reflectance after AC** is an open [impl]/profile
+> choice (see <8.7>).
 
 ### <6.2> Module decomposition and data flow
 
@@ -232,9 +243,10 @@ flowchart TD
   ME --> MT[DPM-M-TOA DN→radiance/reflectance]
   MT -->|L1B| MC[DPM-M-COR inter-band co-registration]
   MC --> MG[DPM-M-GEO georef + ortho + resample]
-  MG --> MP[DPM-M-PAN pan-sharpen  opt]
-  MP -->|L1C| MA[DPM-M-ATM TOA→BOA + class + masks]
+  MG -->|L1C| MA[DPM-M-ATM TOA→BOA + class + masks]
   MA -->|L2A| W[DPM-M-PRD write Zarr EOProduct + provenance]
+  MA -.->|L2A| MP[DPM-M-PAN pan-sharpen  opt, terminal]
+  MP -.->|pan-sharpened L2A derivative| W
   QA[[DPM-M-QA metrics + flag propagation]] -.-> MR & MT & MC & MG & MA & W
   ADF[(ADF set)] -.-> MR & ME & MT & MG & MA
   PROF[(Sensor profile)] -.-> M0 & MR & ME & MT & MC & MG & MP & MA
@@ -300,8 +312,9 @@ acquisition, and read-only (IRD REQ-IF-IN-ADF-01..04; SRS REQ-S-01). Concrete sc
 | `DPM-PR-ENH` | Enhanced (denoised + MTF-compensated) array | focal-plane | `DPM-M-ENH` | optional | `DPM-BKP-ENH` |
 | `DPM-PR-L1B` | TOA radiance (+ optional TOA reflectance) | instrument | `DPM-M-TOA` | **yes** (level) | `DPM-BKP-L1B` |
 | `DPM-PR-COR` | Band-co-registered stack | instrument | `DPM-M-COR` | optional | `DPM-BKP-COR` |
-| `DPM-PR-L1C` | Orthorectified TOA reflectance on cartographic grid (optionally pan-sharpened) | map (CRS) | `DPM-M-GEO` (+ `DPM-M-PAN`) | **yes** (level) | `DPM-BKP-L1C` |
+| `DPM-PR-L1C` | Orthorectified TOA reflectance on cartographic grid (band-co-registered, **no pan-sharpening**) | map (CRS) | `DPM-M-GEO` | **yes** (level) | `DPM-BKP-L1C` |
 | `DPM-PR-L2A` | BOA surface reflectance + scene class + cloud/shadow masks | map (CRS) | `DPM-M-ATM` | **yes** (level) | `DPM-BKP-L2A` |
+| `DPM-PR-L2A-PAN` | Pan-sharpened L2A derivative — BOA reflectance spatially sharpened with PAN (optional, default-off, **terminal** visual/derivative product; **not** science-grade) | map (CRS) | `DPM-M-PAN` *(opt)* | optional | — |
 
 All persisted products carry: measurement band(s), per-pixel QA/mask layer, geolocation (from
 `L1C`), and processing metadata/provenance (input id(s), ADF id+version, profile id+version,
@@ -628,24 +641,39 @@ coverage ⇒ flag/fail-stop.
 
 ---
 
-### <8.7> DPM-M-PAN — Pan-sharpening *(optional)*
+### <8.7> DPM-M-PAN — Pan-sharpening *(optional, terminal post-L2A derivative)*
 
-**Overview / role.** Fuse the co-registered multispectral bands with the higher-resolution
-panchromatic band to produce a high-resolution multispectral product. (Heritage: `pansharp.py`
-`PanSharpening.pan_sharpen`.)
+**Overview / role.** Optional, default-off **terminal post-L2A derivative** step that fuses the
+atmospherically-corrected (BOA) multispectral bands with the higher-resolution panchromatic band to
+produce a spatially-sharpened multispectral **visual/derivative** product. It runs **after**
+atmospheric correction (`DPM-M-ATM`), consuming the `L2A` product (`DPM-PR-L2A`), so fusion operates
+on physically-meaningful **BOA (surface) reflectance** rather than TOA values. Pan-sharpening trades
+spectral/radiometric fidelity for spatial sharpness and is therefore **not a science-grade input** to
+quantitative retrieval/indices. (Heritage: `pansharp.py` `PanSharpening.pan_sharpen`.)
+
+> **Change note (CR-4).** This module was previously placed in the `L1B→L1C` transition (part of
+> L1C); it is moved to an optional terminal post-L2A derivative that runs **after** `DPM-M-ATM`.
+> Empirical basis: atmospheric correction must precede pan-sharpening so fusion operates on BOA, not
+> TOA, reflectance (Lin et al. 2015, WorldView-2). **Open design point (recorded, not resolved
+> here):** rigorous AC is band-specific and the broadband **PAN band is too broad for well-defined
+> atmospheric correction**, so "after AC" requires either producing a **BOA-PAN approximation** or
+> **fusing BOA-MS with TOA-PAN** — a domain mismatch that weakens component-substitution methods
+> (Brovey / GS / PCA). The **order** (AC → pan-sharpen) is settled; the **PAN-reflectance handling**
+> is an open [impl]/profile choice.
 
 **Logical flow.**
 ```mermaid
 flowchart TD
-  ms[/Co-registered MS stack/] --> al[Align MS↔PAN: CLAHE→SIFT→FLANN→RANSAC homography]
-  pan[/PAN band/] --> al
+  ms[/L2A BOA MS stack/] --> al[Align MS↔PAN: CLAHE→SIFT→FLANN→RANSAC homography]
+  pan[/PAN band: BOA-PAN approx or TOA-PAN/] --> al
   al --> warp[warpPerspective MS to PAN grid]
   warp --> fuse[Fuse: per-band combination with PAN]
   fuse --> clip[Clip to valid range]
-  clip --> out[/Pan-sharpened MS at PAN resolution/]
+  clip --> out[/DPM-PR-L2A-PAN: pan-sharpened BOA MS at PAN resolution/]
 ```
 
-**Inputs.** Co-registered MS stack (`DPM-PR-COR`/`DPM-PR-L1C`), PAN band.
+**Inputs.** `DPM-PR-L2A` BOA surface-reflectance MS bands, PAN band (a **BOA-PAN approximation** or
+**TOA-PAN** per the open design point above / the active profile).
 **Parameters.** `DPM-PRM-PAN-01`.
 
 **Mathematical description.** MS↔PAN alignment as in <8.5> (CLAHE → SIFT → FLANN top-10% → RANSAC
@@ -653,9 +681,10 @@ homography `5.0 px` → `warpPerspective` to PAN grid). Heritage fusion is a sim
 `P_b = ½·(MS_b + PAN)`, clipped to `[0, 2¹²−1]`; the production fusion method is profile-selectable.
 Spectral fidelity is measured against the MS input and checked against the per-profile budget.
 
-**Outputs.** Pan-sharpened MS product at PAN resolution + spectral-fidelity QA.
+**Outputs.** `DPM-PR-L2A-PAN` — pan-sharpened (BOA) MS derivative at PAN resolution + spectral-fidelity
+QA; optional, default-off, terminal (a derivative, **not** a science-grade product).
 **Exception handling.** Enabled only when the profile sets it; alignment failure ⇒ flag and skip
-fusion (product remains valid at MS resolution).
+fusion (the `L2A` product remains valid at MS resolution).
 **Trace.** REQ-F-PAN-01..02; SYS-CAP-04, SYS-ADP-01, SYS-QUA-04.
 
 ---
@@ -765,7 +794,7 @@ calibration support and reprocessing (SRS REQ-F-ORC-01, REQ-REL-02; IRD REQ-IF-C
 | `DPM-BKP-ENH` | `DPM-M-ENH` | `DPM-PR-ENH` | intra-`L1B` | off | `DPM-M-TOA` |
 | `DPM-BKP-L1B` | `DPM-M-TOA` | `DPM-PR-L1B` | `L1B` | **on** (level) | `DPM-M-COR` |
 | `DPM-BKP-COR` | `DPM-M-COR` | `DPM-PR-COR` | intra-`L1C` | off | `DPM-M-GEO` |
-| `DPM-BKP-L1C` | `DPM-M-GEO` (+`DPM-M-PAN`) | `DPM-PR-L1C` | `L1C` | **on** (level) | `DPM-M-ATM` |
+| `DPM-BKP-L1C` | `DPM-M-GEO` | `DPM-PR-L1C` | `L1C` | **on** (level) | `DPM-M-ATM` |
 | `DPM-BKP-L2A` | `DPM-M-ATM` | `DPM-PR-L2A` | `L2A` | **on** (level) | — (chain end) |
 
 **Resume semantics.** Resuming from a breakpoint reads the persisted product (by URI) as the module
@@ -773,8 +802,9 @@ input and re-runs the downstream sub-chain with the same profile and ADF set; be
 deterministic (REQ-F-DEP-02), a resumed run reproduces the equivalent full-chain output (bit-identical
 where the algorithm is deterministic, otherwise within the documented tolerance). Enhancement
 (`DPM-M-ENH`) is mandatory and always runs, so its breakpoint is always available as a dump point; the
-optional pan-sharpening (`DPM-M-PAN`) breakpoint is absent from the path when that module is disabled
-by the profile.
+optional pan-sharpening (`DPM-M-PAN`) now runs as a **terminal post-`L2A` derivative** (after
+`DPM-M-ATM`), so it is **not** an intermediate breakpoint on the `L0c → L2A` path and is produced only
+when enabled by the profile.
 
 ---
 
@@ -791,7 +821,7 @@ RD-9 at CDR; upstream `SYS-*`/`REQ-IF-*` are carried via the SRS):
 | `DPM-M-TOA` | REQ-F-TOA-01..03 | `→ L1B` |
 | `DPM-M-COR` | REQ-F-COR-01..03 | `L1B →` |
 | `DPM-M-GEO` | REQ-F-GEO-01..04 | `→ L1C` |
-| `DPM-M-PAN` | REQ-F-PAN-01..02 | intra-`L1C` |
+| `DPM-M-PAN` | REQ-F-PAN-01..02 | post-`L2A` *(opt, terminal)* |
 | `DPM-M-ATM` | REQ-F-ATM-01..04 | `L1C → L2A` |
 | `DPM-M-QA` | REQ-F-QA-01..02 | all |
 | `DPM-M-PRD` | REQ-F-PRD-01..02, REQ-F-ORC-01..02, REQ-F-DEP-01..02 | all |
