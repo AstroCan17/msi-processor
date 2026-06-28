@@ -143,8 +143,8 @@ The three top-level components and their relationship:
                      │   ┌──────────────────────────────────────────────────────┐  │
                      │   │            msi_processor.computing (C-COMPUTING)       │  │
                      │   │   l0_decode → radiometric → enhancement → toa  ───►    │  │
-                     │   │   coregistration → georeference → [pansharpen] ──►     │  │
-                     │   │   atmospheric ;  qa (cross-cutting)                    │  │
+                     │   │   coregistration → georeference → atmospheric ──►      │  │
+                     │   │   [pansharpen] (opt, post-L2A) ;  qa (cross-cutting)   │  │
                      │   │   each stage = pure Core + thin EOProcessingUnit Wrap  │  │
                      │   └──────────────────────────────────────────────────────┘  │
                      └─────────────────────────────────────────────────────────────┘
@@ -311,7 +311,7 @@ blocking strategy (used by the detailed design of <5.4>):
 | C-PU-TOA toa | DPM-M-TOA | low | low | element-wise scaling | line-chunked |
 | C-PU-COR coregistration | DPM-M-COR | med | high | feature detect/match (SIFT/FLANN/RANSAC) | per-band-pair on reference-band overview; full-band warp |
 | C-PU-GEO georeference | DPM-M-GEO | **high** | **high** | DEM ortho + resampling to grid | tiled resampling, windowed DEM reads |
-| C-PU-PAN pansharpen *(opt)* | DPM-M-PAN | med–high | med | MS↔PAN fusion at PAN resolution | tiled; default-off |
+| C-PU-PAN pansharpen *(opt, post-L2A)* | DPM-M-PAN | med–high | med | MS↔PAN fusion at PAN resolution on **L2A BOA** (post-AC, terminal derivative) | tiled; default-off |
 | C-PU-ATM atmospheric | DPM-M-ATM | med | high | RT/retrieval per pixel + classification | grid-chunked; LUT-based RT |
 | C-PU-QA qa | DPM-M-QA | low | low | metric reductions | streaming reductions |
 | C-COMMON services | DPM-M-PRD | low | low | Zarr I/O, provenance | lazy/chunked store I/O |
@@ -397,7 +397,7 @@ msi_processor                                   (software item)
 │   ├── toa              C-PU-TOA   {core, unit}
 │   ├── coregistration   C-PU-COR   {core, unit}
 │   ├── georeference     C-PU-GEO   {core, unit}
-│   ├── pansharpen       C-PU-PAN   {core, unit}   (opt)
+│   ├── pansharpen       C-PU-PAN   {core, unit}   (opt, post-L2A derivative)
 │   ├── atmospheric      C-PU-ATM   {core, unit}
 │   └── qa               C-PU-QA    {core, unit}   (cross-cutting)
 ├── sensors              C-SENSORS                 (profile schema + per-sensor data + ADF bindings)
@@ -475,7 +475,7 @@ governed by the SRF (RD-10), per Annex N.
 | C-PU-TOA | `…computing.toa` | PU (core+unit) | DN→TOA radiance (+opt reflectance), emit `L1B` | reuse-adapt (RD-9 `level_1.TOA`) | REQ-F-TOA-01..03 | DPM-M-TOA / ALG-TOA-* |
 | C-PU-COR | `…computing.coregistration` | PU (core+unit) | Inter-band co-registration to reference band | reuse-adapt (RD-9 `band_coreg`) | REQ-F-COR-01..03 | DPM-M-COR / ALG-COR-* |
 | C-PU-GEO | `…computing.georeference` | PU (core+unit) | Viewing-model geoloc + GCP + DEM ortho → `L1C` | reuse-adapt (RD-9 `georeferencing_v1`) | REQ-F-GEO-01..04 | DPM-M-GEO / ALG-GEO-* |
-| C-PU-PAN | `…computing.pansharpen` | PU (core+unit) *(opt)* | MS↔PAN fusion to high-res MS | reuse-adapt (RD-9 `pansharp`) | REQ-F-PAN-01/02 | DPM-M-PAN / ALG-PAN-* |
+| C-PU-PAN | `…computing.pansharpen` | PU (core+unit) *(opt, post-L2A)* | MS↔PAN fusion to high-res MS on **L2A BOA** (post-AC); terminal optional derivative, default-off | reuse-adapt (RD-9 `pansharp`) | REQ-F-PAN-01/02 | DPM-M-PAN / ALG-PAN-* |
 | C-PU-ATM | `…computing.atmospheric` | PU (core+unit) | AOT/WV, TOA→BOA, scene class + masks → `L2A` | **new** (DPM RD-6/ATBD RD-7) | REQ-F-ATM-01..04 | DPM-M-ATM / ALG-ATM-* |
 | C-PU-QA | `…computing.qa` | PU/library (core+unit) | QA metrics + per-pixel flag propagation | reuse-adapt (RD-9 `metrics_ips`) | REQ-F-QA-01/02 | DPM-M-QA / ALG-QA-* |
 | C-SENSORS | `msi_processor.sensors` | data + schema | Profile schema + per-sensor profile data + ADF bindings | new | REQ-AD-01..04, REQ-DAT-03 | DPM <7.4> |
@@ -985,8 +985,19 @@ implementation `[impl]`.
 
 #### <5.4.8> C-PU-PAN — `pansharpen` *(optional)* (DPM-M-PAN; ALG-PAN-ALIGN/FUSE)
 
-**Identifier/type.** `msi_processor.computing.pansharpen`; PU *(opt)*. **Purpose & trace.** MS↔PAN fusion
-to PAN resolution, spectral-fidelity QA, default-off. *Trace:* REQ-F-PAN-01/02; DPM-M-PAN; ALG-PAN-*.
+**Identifier/type.** `msi_processor.computing.pansharpen`; PU *(opt, terminal post-L2A derivative)*.
+**Purpose & trace.** MS↔PAN fusion to PAN resolution as a **terminal, optional, default-off post-L2A
+derivative product** running **after** atmospheric correction (C-PU-ATM): its input is the **L2A BOA**
+(surface) reflectance product, and it emits a separate pan-sharpened L2A derivative with spectral-fidelity
+QA. *Trace:* REQ-F-PAN-01/02; DPM-M-PAN; ALG-PAN-*.
+
+> **Change note (CR-4).** Pan-sharpening is moved out of the L1B→L1C transition and re-placed as an
+> **optional terminal step after atmospheric correction**. Rationale: pan-sharpening trades
+> spectral/radiometric fidelity for spatial sharpness, so it is a **visual/derivative product, not a
+> science-grade input** to quantitative retrieval/indices; and atmospheric correction must precede fusion
+> so it operates on physically-meaningful **BOA (surface) reflectance** rather than TOA values (empirical
+> guidance: Lin et al. 2015, WorldView-2 AC×pan-sharpen study). `L1C` therefore stays band-co-registered
+> orthorectified **TOA** reflectance with **no** pan-sharpening; the AC→pan-sharpen order is settled.
 
 **Pure-core — signatures & data structures** (`pansharpen.core`):
 
@@ -1006,16 +1017,23 @@ def fuse(ms_aligned: Mapping[str, np.ndarray], pan: np.ndarray,
 
 | Aspect | Value |
 |---|---|
-| `inputs` | `{"l1c"|"cor": EOProduct}` (MS stack + PAN band) |
+| `inputs` | `{"l2a": EOProduct}` (BOA-MS stack + PAN band) — the atmospherically-corrected L2A product (post-AC) |
 | `adfs` | none |
-| `outputs` | `{"pan": EOProduct}` (pan-sharpened MS + spectral-fidelity QA) |
+| `outputs` | `{"pan": EOProduct}` (pan-sharpened **L2A derivative**: fused BOA-MS + spectral-fidelity QA) |
 | `parameters` | `enabled`, `method`, `pan_band` (`DPM-PRM-PAN-01`) |
 | `modes` | `"default"`; **skipped** when `optional_stages.pansharpen=false` |
 
-**Computing-model JSON** (`models/msi_pansharpen_1.0.0.json`): `inputs:[l1c]`, `adfs:[]`,
+**Computing-model JSON** (`models/msi_pansharpen_1.0.0.json`): `inputs:[l2a]`, `adfs:[]`,
 `outputs:[pan]`, `parameters:{enabled, method, pan_band}`, `modes:["default"]`.
 
-**Error/exception handling.** Optional/default-off. Alignment failure ⇒ flag + **skip fusion** (the
+**Open point (PAN reflectance handling) — `[impl]`/profile.** The AC→pan-sharpen *order* is settled, but
+the *PAN-band reflectance* to fuse against BOA-MS is not: rigorous AC is band-specific and the broadband
+**PAN band is too broad for a well-defined atmospheric correction**. "After AC" therefore requires either
+(a) producing a **BOA-PAN approximation**, or (b) **fusing BOA-MS with TOA-PAN** — a TOA/BOA domain
+mismatch that weakens component-substitution methods (Brovey/GS/PCA). The choice between (a) and (b) is an
+open **`[impl]`/profile** decision and is **not resolved here**.
+
+**Error/exception handling.** Optional/default-off. Alignment failure ⇒ flag + **skip fusion** (the L2A
 product remains valid at MS resolution) rather than fail-stop. Spectral fidelity reported vs the
 per-profile budget (REQ-F-PAN-02); if unmet, a spectral-preserving `method` is selected by profile.
 
@@ -1208,8 +1226,9 @@ layout and the profile-file schema) are now controlled in the ICD (RD-5 <5.3.2/3
 | IF-PROD-01 | C-PU-L0 → C-PU-RAD | in-memory `EOProduct` (`L1A`) | `/measurements/detector/<band>` uint16 `(line,detector)` `[0,2^B−1]`; telemetry; `/quality/l0_flags` uint8 |
 | IF-PROD-02 | C-PU-RAD → C-PU-ENH → C-PU-TOA | `EOProduct` (intermediate) | corrected DN float32→uint16; `quality/mask/<band>` uint16 (QAFlag) |
 | IF-PROD-03 | C-PU-TOA → C-PU-COR (`L1B`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L1B` | `/measurements/radiance/<band>` (+`reflectance`), instrument geometry, QA, provenance |
-| IF-PROD-04 | C-PU-COR → C-PU-GEO → C-PU-PAN (`L1C`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L1C` | co-registered → orthorectified TOA reflectance, `conditions/geolocation/{x,y,spatial_ref}`, QA |
-| IF-PROD-05 | C-PU-GEO/PAN → C-PU-ATM (`L2A`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L2A` | BOA reflectance, `quality/scene_classification`, masks, QA, provenance |
+| IF-PROD-04 | C-PU-COR → C-PU-GEO (`L1C`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L1C` | co-registered → orthorectified **TOA** reflectance (no pan-sharpening), `conditions/geolocation/{x,y,spatial_ref}`, QA |
+| IF-PROD-05 | C-PU-GEO → C-PU-ATM (`L2A`) | `EOProduct` + Zarr breakpoint `DPM-BKP-L2A` | BOA reflectance, `quality/scene_classification`, masks, QA, provenance |
+| IF-PROD-06 | C-PU-ATM → C-PU-PAN (opt, terminal) | `EOProduct` (pan-sharpened **L2A derivative**) | BOA-MS fused with PAN to PAN resolution, spectral-fidelity QA; **default-off** (PAN-reflectance handling `[impl]`/profile, <5.4.8>) |
 | IF-CORE-01 | C-PU-*.unit → C-PU-*.core | pure function call | `BandStack` in / (`BandStack` \| arrays + `MetricSet`/residuals) out; **no CPM/IO** (<5.4.1>) |
 | IF-SVC-01 | C-PU-*.unit → C-COM-PRODUCT | function call | `build_eoproduct`/`read`/`write`/`extract_band_stack` |
 | IF-SVC-02 | C-PU-*.unit → C-COM-ADF | function call (URI) | `AuxiliaryDataFile` → `AdfData` (dark, PRNU, gain/offset, BPM, PSF/MTF kernel (`DPM-ADF-PSF`), viewing model, DEM, AOT/WV) |
