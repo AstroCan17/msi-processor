@@ -37,7 +37,7 @@ flowchart TD
     COR --> GEO["georeference<br/>GCP · grid resampling · ortho<br/>L1C"]:::done
     GEO --> ATM["atmospheric — NEW<br/>BOA reflectance · scene class<br/>cloud/shadow masks · L2A"]:::done
     ATM --> PRD[/"L2 Zarr products"/]
-    ATM --> PAN["pansharpen (opt) — post-L2A<br/>fused L2A derivative"]:::todo
+    ATM --> PAN["pansharpen (opt) — post-L2A<br/>MS↔PAN fuse · spectral-fidelity QA<br/>L2A derivative"]:::done
     PAN --> PRD
 
     FOUND["foundation · DONE<br/>common (types, metrics) · exceptions · sensors profile"]:::done
@@ -51,11 +51,13 @@ profile) and the `radiometric` (NUC / dark / BPR / saturation), `enhancement` (M
 PSF deconvolution + configurable denoise), `toa` (DN → radiance → reflectance), `coregister`
 (SIFT + homography), `georeference` (GCP refinement + cartographic-grid resampling) and
 `atmospheric` (6S TOA → BOA inversion + spectral-threshold scene classification with cloud / cloud-shadow
-masks) processing units — the **L0c → L2A** chain — each with synthetic unit tests. The rigorous
-viewing-model / DEM orthorectification, the radiative-transfer engine that builds the atmospheric LUT, and
-image-based atmospheric-parameter retrieval are private `[impl]` interfaces.
-**Planned:** `pansharpen` (optional, **post-L2A** fused derivative — runs after atmospheric correction,
-not at L1C), and `l0_decode` (L0 decode; the proprietary codec body stays a private `[impl]`).
+masks) processing units — the **L0c → L2A** chain — plus the optional, default-off `pansharpen`
+(**post-L2A** MS↔PAN fusion with per-band spectral-fidelity QA — runs after atmospheric correction, not at
+L1C) terminal derivative — each with synthetic unit tests. The rigorous viewing-model / DEM
+orthorectification, the radiative-transfer engine that builds the atmospheric LUT, image-based
+atmospheric-parameter retrieval and the component-substitution fusion methods (Brovey / GS / IHS / à-trous;
+only simple-mean is operational) are private `[impl]` interfaces.
+**Planned:** `l0_decode` (L0 decode; the proprietary codec body stays a private `[impl]`).
 
 **ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the
 baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …).
