@@ -61,8 +61,10 @@ radiative-transfer engine that builds the atmospheric LUT, image-based atmospher
 retrieval and the component-substitution fusion methods (Brovey / GS / IHS / à-trous; only
 simple-mean is operational) are private `[impl]` interfaces.
 
-**ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the
-baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …).
+**ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ✅ · AR ⬜ — see `compliance/` for the
+baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …). The
+QR data package (SVR, SUITR, SRN, CIDL, SCF + the QR review report) concluded **pass with
+actions** — the Tier-C numeric performance budgets are validated on operator data at AR.
 
 ## Project Structure
 
