@@ -1,0 +1,21 @@
+{
+  "available_modes": ["default"],
+  "default_mode": "default",
+  "modes_config": {
+    "default": {
+      "inputs": {
+        "l0c": {"type": "product", "spec": {}}
+      },
+      "adfs": {},
+      "outputs": {
+        "l1a": {"type": "product", "spec": {}}
+      },
+      "parameters": {
+        "bit_depth": {"required": false},
+        "line_factor": {"required": false},
+        "fill_value": {"required": false},
+        "max_lost_fraction": {"required": false}
+      }
+    }
+  }
+}
