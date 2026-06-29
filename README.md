@@ -25,11 +25,11 @@ documentation-first software lifecycle.
 
 ## Processing chain & status
 
-End-to-end L0 → L2 processing chain. 🟢 implemented (CI-green) · ⬜ planned.
+End-to-end L0 → L2 processing chain — all units implemented (CI-green). 🟢
 
 ```mermaid
 flowchart TD
-    RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>L0 → L1A"]:::todo
+    RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>open-container decode · line-loss<br/>QA seed · telemetry · L1A"]:::done
     L0 --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>L1A"]:::done
     RAD --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)<br/>L1B"]:::done
     ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::done
@@ -47,17 +47,19 @@ flowchart TD
 ```
 
 **Implemented (CI-green):** the foundation (common types/metrics, exception hierarchy, sensor
-profile) and the `radiometric` (NUC / dark / BPR / saturation), `enhancement` (MTF compensation /
-PSF deconvolution + configurable denoise), `toa` (DN → radiance → reflectance), `coregister`
-(SIFT + homography), `georeference` (GCP refinement + cartographic-grid resampling) and
-`atmospheric` (6S TOA → BOA inversion + spectral-threshold scene classification with cloud / cloud-shadow
-masks) processing units — the **L0c → L2A** chain — plus the optional, default-off `pansharpen`
-(**post-L2A** MS↔PAN fusion with per-band spectral-fidelity QA — runs after atmospheric correction, not at
-L1C) terminal derivative — each with synthetic unit tests. The rigorous viewing-model / DEM
-orthorectification, the radiative-transfer engine that builds the atmospheric LUT, image-based
-atmospheric-parameter retrieval and the component-substitution fusion methods (Brovey / GS / IHS / à-trous;
-only simple-mean is operational) are private `[impl]` interfaces.
-**Planned:** `l0_decode` (L0 decode; the proprietary codec body stays a private `[impl]`).
+profile) and all eight processing units — `l0_decode` (Level-0 → L1A: line-loss truncation,
+legality, QA seeding, telemetry pass-through), `radiometric` (NUC / dark / BPR / saturation),
+`enhancement` (MTF compensation / PSF deconvolution + configurable denoise), `toa`
+(DN → radiance → reflectance), `coregister` (SIFT + homography), `georeference` (GCP refinement +
+cartographic-grid resampling) and `atmospheric` (6S TOA → BOA inversion + spectral-threshold scene
+classification with cloud / cloud-shadow masks) — the **L0c → L2A** chain — plus the optional,
+default-off `pansharpen` (**post-L2A** MS↔PAN fusion with per-band spectral-fidelity QA — runs after
+atmospheric correction, not at L1C) terminal derivative — each with synthetic unit tests. The
+sensor-private Level-0 source-packet decode body (the public path consumes the documented
+open-container sample layout), the rigorous viewing-model / DEM orthorectification, the
+radiative-transfer engine that builds the atmospheric LUT, image-based atmospheric-parameter
+retrieval and the component-substitution fusion methods (Brovey / GS / IHS / à-trous; only
+simple-mean is operational) are private `[impl]` interfaces.
 
 **ECSS lifecycle:** SRR ✅ · PDR ✅ · CDR ✅ · QR ⬜ · AR ⬜ — see `compliance/` for the
 baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability matrix, …).
