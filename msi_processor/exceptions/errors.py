@@ -34,6 +34,7 @@ __all__ = [
     "InputValidationError",
     "ProfileValidationError",
     "AdfResolutionError",
+    "L0DecodeError",
     "RadiometricError",
     "CoregistrationError",
     "GeolocationError",
@@ -92,6 +93,16 @@ class ProfileValidationError(MsiProcessorError):
 
 class AdfResolutionError(MsiProcessorError):
     """Missing or validity-mismatched ADF (REQ-S-04; C-COM-ADF)."""
+
+
+class L0DecodeError(MsiProcessorError):
+    """Level-0 decode failure / sensor-private decode body unavailable (REQ-F-L0-*).
+
+    Raised by the public scaffolding when the source-packet decode cannot be
+    performed because the sensor/NDA-specific decode body is a private
+    ``[impl]`` backend not present in this distribution, or when a decoded
+    open-container frame fails Level-0 legality (REQ-F-L0-03).
+    """
 
 
 class RadiometricError(MsiProcessorError):
