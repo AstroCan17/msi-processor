@@ -299,8 +299,34 @@ class AtmosphericUnit(EOProcessingUnit):
 
         output_name = str(kwargs.get("name", f"{l1c.name}_L2A"))
         l2a = self._build_l2a_product(output_name, boa, scene_class, out_qa, param_mode, geometry)
+        self._passthrough_geolocation(l1c, l2a)
         outputs: dict[str, DataType] = {"l2a": l2a}
         return outputs
+
+    @staticmethod
+    def _passthrough_geolocation(l1c: EOProduct, l2a: EOProduct) -> None:
+        """Carry the L1C cartographic geolocation grid (conditions/*) into L2A.
+
+        A gridded L2A product must retain its geolocation; the BOA inversion does
+        not touch the grid, so the ``conditions`` tree (geolocation x/y and the
+        ``spatial_ref`` CRS, with its attributes) is copied verbatim.
+        """
+        try:
+            conditions = cast(EOGroup, l1c["conditions"])
+        except KeyError:
+            return
+        l2a["conditions"] = EOGroup()
+
+        def _copy(group: EOGroup, prefix: str) -> None:
+            for name, item in group.items():
+                path = f"{prefix}/{name}"
+                if isinstance(item, EOGroup):
+                    _copy(item, path)
+                else:
+                    var = cast(EOVariable, item)
+                    l2a[path] = EOVariable(data=np.asarray(var.data), dims=var.dims, attrs=dict(var.attrs))
+
+        _copy(conditions, "conditions")
 
     # ----------------------------------------------------------------------- #
     # Helpers                                                                  #
