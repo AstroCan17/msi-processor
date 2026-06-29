@@ -116,6 +116,23 @@ def test_run_emits_l2a_boa_product():
 
 
 @pytest.mark.unit
+def test_run_propagates_geolocation_grid():
+    """A gridded L1C's geolocation (conditions/*) is carried into the L2A, attrs kept."""
+    l1c = _l1c(_toa_scene())
+    l1c["conditions"] = EOGroup()
+    l1c["conditions/geolocation/x"] = EOVariable(data=np.arange(4, dtype=np.float64), dims=("x",))
+    l1c["conditions/geolocation/y"] = EOVariable(data=np.arange(1, dtype=np.float64), dims=("y",))
+    l1c["conditions/geolocation/spatial_ref"] = EOVariable(
+        data=np.array([0], dtype=np.int32), dims=("ref",), attrs={"crs_wkt": "TEST_WKT"}
+    )
+    l2a = AtmosphericUnit("atm").run(
+        {"l1c": l1c}, {"atmospheric": _atmospheric_adf(), "dem": _dem_adf()}, sun_zenith=30.0
+    )["l2a"]
+    assert np.asarray(l2a["conditions/geolocation/x"].data).shape == (4,)
+    assert l2a["conditions/geolocation/spatial_ref"].attrs["crs_wkt"] == "TEST_WKT"
+
+
+@pytest.mark.unit
 def test_run_boa_below_toa_for_clear_pixel():
     """Removing path reflectance lowers a clear-pixel reflectance vs TOA."""
     toa = _toa_scene()
