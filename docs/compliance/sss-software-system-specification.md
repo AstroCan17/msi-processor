@@ -1,0 +1,1 @@
+../../compliance/drd/sss-software-system-specification.md
