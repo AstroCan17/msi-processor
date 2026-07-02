@@ -371,6 +371,30 @@ integration-tests:
       - ${TEST_PROJECT}/${REPORTS}/
       - ${TEST_PROJECT}/.coverage
 
+# Manual results job: produce the demo L1B through the real chain (generator
+# open-container L0 + cal-DB -> l0_decode -> radiometric -> enhancement -> toa via the
+# generator's E2E driver) and artifact the per-band QA statistics + quicklook that feed
+# the README / docs "Results" section.
+product-stats:
+  stage: integration tests
+  timeout: 30m
+  before_script:
+    - pip install .
+    - rm -rf /tmp/raw-generator
+    - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/e2es/s2-msi-raw-generator.git" /tmp/raw-generator
+    - pip install -e /tmp/raw-generator
+  script:
+    - python /tmp/raw-generator/scripts/run_e2e_l0_to_l1b.py results-store
+    - python scripts/product_stats.py results-store/l1b/L1B_TOA.zarr | tee product_stats.md
+  artifacts:
+    paths:
+      - product_stats.md
+      - results-store/quicklook/
+    expire_in: 1 week
+  rules:
+    - when: manual
+      allow_failure: true
+
 # DOCUMENTATION GENERATION SECTION
 #
 # The documentation include unit and integration tests reports.
