@@ -113,5 +113,5 @@ Reproduce
 Run the manual **product-stats** CI job (integration-tests stage): it produces the
 demo L1B through the real chain via the generator's E2E driver and artifacts the
 statistics table and the quicklook shown here. Locally (eopf environment):
-``python <generator>/scripts/run_e2e_l0_to_l1b.py <store>`` then
-``python scripts/product_stats.py <store>/l1b/L1B_TOA.zarr``.
+``python <generator>/scripts/run_pipeline.py <store> --synthetic`` then
+``python scripts/product_stats.py <store>/l1b/S02MSIL1B_*.zarr``.
