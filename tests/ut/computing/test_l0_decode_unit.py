@@ -63,8 +63,8 @@ def _l0c(n_lines: int = 8, lost_tail: int = 0, with_conditions: bool = True) -> 
 def test_model_declares_input_and_no_adfs():
     """The computing-model JSON loads and declares l0c input with no ADFs."""
     unit = L0DecodeUnit("l0")
-    assert unit.get_mandatory_input_list("default") == ["l0c"]
-    assert unit.get_mandatory_adf_list("default") == []
+    assert unit.get_mandatory_input_list("nominal") == ["l0c"]
+    assert unit.get_mandatory_adf_list("nominal") == []
     assert unit.PROCESSOR_LEVEL == "L1A"
     assert unit.PROCESSOR_NAME == "msi_l0_decode"
 

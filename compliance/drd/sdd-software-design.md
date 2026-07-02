@@ -656,7 +656,7 @@ ATBD <5.1>); the output of the Core is a `BandStack` of `geom="focal_plane"` plu
 | `adfs` | none (no calibration at L0) |
 | `outputs` | `{"l1a": EOProduct}` — DataTree `ICD <5.3.1>A` (`/measurements/detector/<band>`, `/conditions/{time,orbit,attitude}`, `/quality/l0_flags/<band>`) |
 | `parameters` (`**kwargs`) | `profile_id`, `profile_version`, `bit_depth` (`DPM-PRM-GEN-01`), `line_factor` map (`DPM-PRM-L0-01`), `legality_thresholds` |
-| `modes` | `"default"` |
+| `modes` | `"nominal"` |
 
 **Computing-model JSON** (`models/msi_l0_decode_1.0.0.json`; CPM schema, exact keys bound to 2.8.1
 [TBC@CDR]):
@@ -673,7 +673,7 @@ ATBD <5.1>); the output of the Core is a `BandStack` of `geom="focal_plane"` plu
     "bit_depth":       {"type": "integer", "default": 12},
     "line_factor":     {"type": "object",  "default": {}}
   },
-  "modes": ["default"]
+  "modes": ["nominal"]
 }
 ```
 
@@ -737,7 +737,7 @@ The Core consumes/produces a `BandStack` (`geom="focal_plane"`). Per-detector `g
 | `adfs` | `{"dark"}` (mandatory), `{"nuc"}` *or* `{"flatfield"}` (mode-dependent), `{"badpixel"}` (profile) — ICD <5.3.2>A |
 | `outputs` | `{"rad": EOProduct}` (corrected DN + QA); optional `{"nuc": EOProduct}` calibration ADF in `calibration` mode |
 | `parameters` | `RadiometricParams` fields (`DPM-PRM-RAD-01..04`, `DPM-PRM-GEN-01`) |
-| `modes` | `"default"` (read `nuc` ADF), `"calibration"` (derive `nuc` from `dark`+`flatfield`, REQ-F-RAD-05) |
+| `modes` | `"nominal"` (read `nuc` ADF), `"calibration"` (derive `nuc` from `dark`+`flatfield`, REQ-F-RAD-05) |
 
 **Computing-model JSON** (`models/msi_radiometric_1.0.0.json`):
 
@@ -757,7 +757,7 @@ The Core consumes/produces a `BandStack` (`geom="focal_plane"`). Per-detector `g
     "g_min": {"type": "number"}, "g_max": {"type": "number"},
     "remove_dark_fft": {"type": "boolean", "default": false}
   },
-  "modes": ["default", "calibration"]
+  "modes": ["nominal", "calibration"]
 }
 ```
 
@@ -817,11 +817,11 @@ def mtf_compensate(image: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
 | `adfs` | `{"psf"}` (**mandatory** — `DPM-ADF-PSF`, per-band 2-D PSF/MTF kernel for MTFC, float32, unit-DC-gain normalised, by URI/read-only), `{"dark"}` (optional, only if `fft_dark`) |
 | `outputs` | `{"enh": EOProduct}` (MTFC-restored, optionally denoised bands + QA-metric deltas via C-PU-QA) |
 | `parameters` | `{mtfc:{regularization}, denoise:{method,params,enabled}}` (`DPM-PRM-ENH-01..05`); per-band overrides. PSF kernel is the mandatory `psf` ADF (`DPM-ADF-PSF`), no longer a parameter |
-| `modes` | `"default"`; the stage **always runs** (MTFC mandatory); only the denoise sub-step is profile-configurable (REQ-F-ENH-03) |
+| `modes` | `"nominal"`; the stage **always runs** (MTFC mandatory); only the denoise sub-step is profile-configurable (REQ-F-ENH-03) |
 
 **Computing-model JSON** (`models/msi_enhancement_1.0.0.json`): `inputs:[{rad,true}]`, `adfs:[{psf,true},{dark,false}]`,
 `outputs:[{enh,true}]`, `parameters` carrying the nested `mtfc` (PSF deconvolution, always applied; kernel
-from the `psf` ADF) and `denoise` (configurable) objects, `modes:["default"]`.
+from the `psf` ADF) and `denoise` (configurable) objects, `modes:["nominal"]`.
 
 **Error/exception handling.** Mandatory stage — MTFC (PSF deconvolution) is always applied; only the
 denoise sub-step is profile-configurable (REQ-F-ENH-03). Outputs always clipped to the valid range;
@@ -863,11 +863,11 @@ def solar_geometry(acq_time: "datetime", lon: float, lat: float) -> tuple[float,
 | `adfs` | `{"radiometric"}` (mandatory), `{"spectral"}` (for reflectance) — ICD <5.3.2>A |
 | `outputs` | `{"l1b": EOProduct}` — `/measurements/radiance/<band>` (+ `/measurements/reflectance/<band>`), QA, provenance |
 | `parameters` | `emit_reflectance` (`DPM-PRM-TOA-03`), `esun` per band & geometry source (`DPM-PRM-TOA-01/02`, mostly ADF/derived) |
-| `modes` | `"default"` |
+| `modes` | `"nominal"` |
 
 **Computing-model JSON** (`models/msi_toa_1.0.0.json`): `inputs:[{enh}]`,
 `adfs:[{radiometric,true},{spectral,false}]`, `outputs:[l1b]`,
-`parameters:{emit_reflectance:{boolean,default:false}}`, `modes:["default"]`.
+`parameters:{emit_reflectance:{boolean,default:false}}`, `modes:["nominal"]`.
 
 **Error/exception handling.** Validity-mismatched radiometric/spectral ADF ⇒ `AdfResolutionError`,
 fail-stop. Non-physical (negative) radiance clipped + flagged. ESUN is profile/ADF data — the heritage
@@ -918,11 +918,11 @@ def coregister(bands: Mapping[str, np.ndarray], params: CoregParams
 | `adfs` | none |
 | `outputs` | `{"cor": EOProduct}` (co-registered stack + residual QA) |
 | `parameters` | `CoregParams` fields (`DPM-PRM-COR-01..04`) |
-| `modes` | `"default"` |
+| `modes` | `"nominal"` |
 
 **Computing-model JSON** (`models/msi_coregistration_1.0.0.json`): `inputs:[l1b]`, `adfs:[]`,
 `outputs:[cor]`, `parameters:{reference_band, match_fraction, ransac_tau, min_keypoints, …}`,
-`modes:["default"]`.
+`modes:["nominal"]`.
 
 **Error/exception handling.** Insufficient keypoints/matches or residual outside acceptance ⇒
 `CoregistrationError`, the affected band flagged `COREG_FAIL`, and fail-stop (REQ-F-COR-03,
@@ -972,11 +972,11 @@ def resample_to_grid(image: np.ndarray, src_geo, dst: Geotransform,
 | `adfs` | `{"viewing_model"}`, `{"dem"}` (mandatory), `{"gcp"}` (optional) — ICD <5.3.2>A |
 | `outputs` | `{"l1c": EOProduct}` — gridded `/measurements/reflectance/<band>`, `/conditions/geolocation/{x,y,spatial_ref}`, QA, provenance |
 | `parameters` | `crs`, `grid`, `resolution`, `resampling`, `use_gcp` (`DPM-PRM-GEO-01..03`); interior geometry `p,f` from `viewing_model` |
-| `modes` | `"default"` |
+| `modes` | `"nominal"` |
 
 **Computing-model JSON** (`models/msi_georeference_1.0.0.json`): `inputs:[cor]`,
 `adfs:[{viewing_model,true},{dem,true},{gcp,false}]`, `outputs:[l1c]`,
-`parameters:{crs, grid, resolution, resampling, use_gcp}`, `modes:["default"]`.
+`parameters:{crs, grid, resolution, resampling, use_gcp}`, `modes:["nominal"]`.
 
 **Error/exception handling.** Missing DEM/viewing-model coverage for the footprint/epoch ⇒
 `GeolocationError`, fail-stop. Geolocation error verified locally vs `GEO_CE90` (REQ-F-GEO-03, REQ-Q-03).
@@ -1021,10 +1021,10 @@ def fuse(ms_aligned: Mapping[str, np.ndarray], pan: np.ndarray,
 | `adfs` | none |
 | `outputs` | `{"pan": EOProduct}` (pan-sharpened **L2A derivative**: fused BOA-MS + spectral-fidelity QA) |
 | `parameters` | `enabled`, `method`, `pan_band` (`DPM-PRM-PAN-01`) |
-| `modes` | `"default"`; **skipped** when `optional_stages.pansharpen=false` |
+| `modes` | `"nominal"`; **skipped** when `optional_stages.pansharpen=false` |
 
 **Computing-model JSON** (`models/msi_pansharpen_1.0.0.json`): `inputs:[l2a]`, `adfs:[]`,
-`outputs:[pan]`, `parameters:{enabled, method, pan_band}`, `modes:["default"]`.
+`outputs:[pan]`, `parameters:{enabled, method, pan_band}`, `modes:["nominal"]`.
 
 **Open point (PAN reflectance handling) — `[impl]`/profile.** The AC→pan-sharpen *order* is settled, but
 the *PAN-band reflectance* to fuse against BOA-MS is not: rigorous AC is band-specific and the broadband
@@ -1073,11 +1073,11 @@ def classify_scene(boa: Mapping[str, np.ndarray], params: Mapping[str, object]
 | `adfs` | `{"atmospheric"}` (AOT/WV/RT-LUT, ingest mode), `{"dem"}` — ICD <5.3.2>A |
 | `outputs` | `{"l2a": EOProduct}` — `/measurements/reflectance/<band>` (BOA), `/quality/scene_classification`, masks, QA, provenance |
 | `parameters` | `mode` (retrieve\|ingest), `model`/LUT id, classification options (`DPM-PRM-ATM-01/02`) |
-| `modes` | `"default"` |
+| `modes` | `"nominal"` |
 
 **Computing-model JSON** (`models/msi_atmospheric_1.0.0.json`): `inputs:[l1c]`,
 `adfs:[{atmospheric,false},{dem,true}]`, `outputs:[l2a]`,
-`parameters:{mode:{enum:[retrieve,ingest]}, model, classification_opts}`, `modes:["default"]`.
+`parameters:{mode:{enum:[retrieve,ingest]}, model, classification_opts}`, `modes:["nominal"]`.
 
 **Error/exception handling.** Missing atmospheric/DEM coverage for the footprint/epoch ⇒
 `AtmosphericError`, fail-stop. Cloud / cloud-shadow pixels flagged `CLOUD`/`CLOUD_SHADOW` (REQ-F-ATM-03).
@@ -1107,7 +1107,7 @@ def merge_flags(*masks: np.ndarray) -> np.ndarray:
 
 **EOProcessingUnit wrapper — `run()` I/O** (`qa.unit.QaUnit`). Usable standalone (`inputs:{"test",
 "reference"?}` → `outputs:{"metrics"}`) and as a library called inline by the other PUs (step 5 of the
-wrapper template). `modes:["default"]`. **Computing-model JSON** `models/msi_qa_1.0.0.json`:
+wrapper template). `modes:["nominal"]`. **Computing-model JSON** `models/msi_qa_1.0.0.json`:
 `inputs:[{test,true},{reference,false}]`, `outputs:[metrics]`, `parameters:{metric_set, reference_sel}`.
 
 **Error/exception handling.** Metrics are **observational** and never abort the chain; a metric outside

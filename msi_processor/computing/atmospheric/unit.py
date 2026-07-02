@@ -230,7 +230,7 @@ class AtmosphericUnit(EOProcessingUnit):
             AOT/water-vapour + a resolved RT-LUT) and ``dem`` (mandatory; surface
             altitude).
         mode:
-            ``"default"`` (the only supported processing mode).
+            ``"nominal"`` (the only supported processing mode).
         **kwargs:
             ``param_mode`` (``"ingest"`` | ``"retrieve"``, default ``"ingest"``),
             ``sun_zenith`` / ``view_zenith`` / ``relative_azimuth`` (scene geometry
@@ -252,10 +252,10 @@ class AtmosphericUnit(EOProcessingUnit):
             (REQ-F-ATM-04).
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown atmospheric mode '{run_mode}'; expected 'default'",
+                f"Unknown atmospheric mode '{run_mode}'; expected 'nominal'",
                 stage=_STAGE,
             )
 
@@ -389,7 +389,7 @@ class AtmosphericUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "param_mode": param_mode,

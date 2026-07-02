@@ -27,24 +27,41 @@ documentation-first software lifecycle.
 
 End-to-end L0 → L2 processing chain — all units implemented (CI-green). 🟢
 
+Each unit is an EOPF `EOProcessingUnit`: it consumes the previous unit's product under a
+named **input key**, takes its Auxiliary Data Files (**ADFs**) as run inputs, and emits its
+product under a named **output key** (the edge labels below). All units run in the
+**`nominal`** mode; `radiometric` additionally offers a **`calibration`** mode (derive the
+NUC from `dark` + `flatfield` acquisitions and emit it as a calibration product), and
+`pansharpen` is **off by default** (CR-4).
+
 ```mermaid
 flowchart TD
-    RAW[/"L0 RAW · downlink"/] --> L0["l0_decode<br/>open-container decode · line-loss<br/>QA seed · telemetry · L1A"]:::done
-    L0 --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>L1A"]:::done
-    RAD --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)<br/>L1B"]:::done
-    ENH --> TOA["toa<br/>DN → radiance → reflectance<br/>L1B"]:::done
-    TOA --> COR["coregister<br/>band co-registration<br/>L1B→L1C"]:::done
-    COR --> GEO["georeference<br/>GCP · grid resampling · ortho<br/>L1C"]:::done
-    GEO --> ATM["atmospheric — NEW<br/>BOA reflectance · scene class<br/>cloud/shadow masks · L2A"]:::done
-    ATM --> PRD[/"L2 Zarr products"/]
-    ATM --> PAN["pansharpen (opt) — post-L2A<br/>MS↔PAN fuse · spectral-fidelity QA<br/>L2A derivative"]:::done
-    PAN --> PRD
+    RAW[/"L0 downlink product<br/>(open-container Zarr)"/] -- "l0c" --> L0["l0_decode<br/>line-loss truncation · legality<br/>QA seed · telemetry"]:::done
+    L0 -- "l1a" --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>modes: nominal | calibration"]:::done
+    RAD -- "rad" --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)"]:::done
+    RAD -. "nuc · calibration mode" .-> CAL[/"derived NUC<br/>calibration product"/]
+    ENH -- "enh" --> TOA["toa<br/>DN → radiance<br/>(→ reflectance, optional)"]:::done
+    TOA -- "l1b" --> COR["coregister<br/>band co-registration<br/>CLAHE · match · RANSAC"]:::done
+    COR -- "cor" --> GEO["georeference<br/>GCP · grid resampling · ortho"]:::done
+    GEO -- "l1c" --> ATM["atmospheric<br/>BOA reflectance · scene class<br/>cloud/shadow masks"]:::done
+    ATM -- "l2a" --> PRD[/"L2 Zarr products"/]
+    ATM -- "l2a" --> PAN["pansharpen — opt, off by default<br/>post-L2A MS↔PAN fuse<br/>spectral-fidelity QA"]:::done
+    PAN -- "pan" --> PRD
 
-    FOUND["foundation · DONE<br/>common (types, metrics) · exceptions · sensors profile"]:::done
+    A1[/"ADFs: dark · nuc | flatfield · badpixel"/] -.-> RAD
+    A2[/"ADF: psf"/] -.-> ENH
+    A3[/"ADFs: radiometric · spectral"/] -.-> TOA
+    A4[/"ADFs: viewing_model · dem · gcp"/] -.-> GEO
+    A5[/"ADFs: dem · atmospheric"/] -.-> ATM
+
+    FOUND["foundation<br/>common (types, metrics) · exceptions · sensors profile"]:::done
 
     classDef done fill:#1f7a1f,color:#fff,stroke:#0d3d0d,stroke-width:2px;
     classDef todo fill:#3f3f3f,color:#eee,stroke:#222;
 ```
+
+`l0_decode` and `coregister` consume no ADFs; `toa`'s `spectral` ADF is required only when
+reflectance is emitted; `georeference`'s `gcp` and `radiometric`'s `badpixel` are optional.
 
 **Implemented (CI-green):** the foundation (common types/metrics, exception hierarchy, sensor
 profile) and all eight processing units — `l0_decode` (Level-0 → L1A: line-loss truncation,
