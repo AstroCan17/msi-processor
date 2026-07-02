@@ -457,7 +457,7 @@ against the installed `eopf == 2.8.1`** (see <2> note); each stage is realised a
 | Computing model | `processing_model() -> Optional[EOProcessingModel]`; per-PU declaration resolved by processor name/version + mode (model file `models/<snake_name>_<mode>.json|.toml`), schema in table D |
 | Core method | `run(self, inputs: MappingDataType, adfs: Optional[MappingAuxiliary] = None, mode: Optional[str] = None, **kwargs) -> MappingDataType` |
 | Validated entry | `run_validating(self, inputs, adfs=None, mode=None, validation_mode: ValidationMode = ValidationMode.STRUCTURE, **kwargs) -> MappingDataType` — validates run params against the model, runs, appends processing-history, validates outputs |
-| Modes | `get_available_modes() -> List[str]`, `get_default_mode() -> str` (default `"default"` when no model) |
+| Modes | `get_available_modes() -> List[str]`, `get_default_mode() -> str` (default `"nominal"` when no model) |
 | Mandatory decls | `get_mandatory_input_list(mode=None, **kwargs) -> list[str]`, `get_mandatory_adf_list(mode=None, **kwargs) -> list[str]` |
 
 - `inputs` keys = the PU's declared input names; values are `DataType` (or an iterable of `DataType`).
@@ -496,10 +496,10 @@ input/output list. The schema and a worked example for `msi_l0_decode`:
 ```jsonc
 // CPM EOProcessingModel: per-mode declaration. Dict keys MAY be regex.
 {
-  "available_modes": ["default"],          // all supported modes
-  "default_mode": "default",               // must be in available_modes
+  "available_modes": ["nominal"],          // all supported modes
+  "default_mode": "nominal",               // must be in available_modes
   "modes_config": {                        // one config per mode
-    "default": {
+    "nominal": {
       "inputs":  { "l0":  { "type": "product", "spec": { /* EOProductModel */ }, "iterable_allowed": false } },
       "adfs":    {  },                       // {<name>: {"spec": {"required": <bool>}}}
       "outputs": { "l1a": { "type": "product", "spec": { /* EOProductModel */ } } },

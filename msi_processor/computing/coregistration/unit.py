@@ -121,7 +121,7 @@ class CoregistrationUnit(EOProcessingUnit):
         adfs:
             None (this stage takes no ADFs).
         mode:
-            ``"default"`` (the only supported mode).
+            ``"nominal"`` (the only supported mode).
         **kwargs:
             :class:`CoregParams` fields — ``reference_band`` (mandatory),
             ``clahe_clip``, ``clahe_grid``, ``match_fraction``, ``min_keypoints``,
@@ -142,10 +142,10 @@ class CoregistrationUnit(EOProcessingUnit):
             REQ-F-COR-03).
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown coregistration mode '{run_mode}'; expected 'default'",
+                f"Unknown coregistration mode '{run_mode}'; expected 'nominal'",
                 stage="coregistration",
             )
 
@@ -261,7 +261,7 @@ class CoregistrationUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "reference_band": params.reference_band,

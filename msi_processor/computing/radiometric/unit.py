@@ -30,7 +30,7 @@ holding the opened data):
   (both keys optional; ``dark_offset`` defaults to 0.0, ``frame`` is only
   needed for FFT dark removal or calibration-mode NUC derivation)
 * ``nuc``       -> ``{"gain": {band: ndarray1d}, "offset": {band: ndarray1d}}``
-  (default mode)
+  (nominal mode)
 * ``flatfield`` -> ``{band: ndarray2d}`` (calibration mode)
 * ``badpixel``  -> ``{band: ndarray1d[bool]}`` (optional)
 
@@ -73,7 +73,7 @@ from msi_processor.exceptions.errors import (
 _DETECTOR_GROUP = "measurements/detector"
 _MASK_GROUP = "quality/mask"
 _DIMS = ("line", "detector")
-_VALID_MODES = ("default", "calibration")
+_VALID_MODES = ("nominal", "calibration")
 
 
 def _coerce_mapping(adf: AuxiliaryDataFile) -> dict[str, Any]:
@@ -146,10 +146,10 @@ class RadiometricUnit(EOProcessingUnit):
         inputs:
             ``{"l1a": EOProduct}`` with bands under ``measurements/detector``.
         adfs:
-            ``dark`` (mandatory); ``nuc`` (default mode) or ``flatfield``
+            ``dark`` (mandatory); ``nuc`` (nominal mode) or ``flatfield``
             (calibration mode); ``badpixel`` (optional).
         mode:
-            ``"default"`` (read NUC from ADF) or ``"calibration"`` (derive
+            ``"nominal"`` (read NUC from ADF) or ``"calibration"`` (derive
             NUC from dark+flat and emit a ``nuc`` product, REQ-F-RAD-05).
         **kwargs:
             :class:`RadiometricParams` fields plus optional ``name`` for the
@@ -162,7 +162,7 @@ class RadiometricUnit(EOProcessingUnit):
             ``{"nuc": EOProduct}`` in calibration mode.
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
+        run_mode = mode or "nominal"
         if run_mode not in _VALID_MODES:
             raise InputValidationError(
                 f"Unknown radiometric mode '{run_mode}'; expected one of {_VALID_MODES}",
@@ -223,8 +223,8 @@ class RadiometricUnit(EOProcessingUnit):
         bands: Mapping[str, npt.NDArray[Any]],
         dark_frames: Mapping[str, Any],
     ) -> tuple[dict[str, npt.NDArray[Any]], dict[str, npt.NDArray[Any]]]:
-        """Resolve per-band gain/offset: read (default) or derive (calibration)."""
-        if mode == "default":
+        """Resolve per-band gain/offset: read (nominal) or derive (calibration)."""
+        if mode == "nominal":
             nuc_data = _coerce_mapping(_require_adf(adfs, "nuc", mode))
             gain_map = dict(nuc_data.get("gain", {}))
             offset_map = dict(nuc_data.get("offset", {}))

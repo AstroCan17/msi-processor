@@ -78,8 +78,8 @@ def _l2a(pan_band: str = "PAN") -> EOProduct:
 def test_model_declares_input_and_no_adfs():
     """The computing-model JSON loads and declares l2a input with no ADFs."""
     unit = PansharpenUnit("pan")
-    assert unit.get_mandatory_input_list("default") == ["l2a"]
-    assert unit.get_mandatory_adf_list("default") == []
+    assert unit.get_mandatory_input_list("nominal") == ["l2a"]
+    assert unit.get_mandatory_adf_list("nominal") == []
     assert unit.PROCESSOR_LEVEL == "L2A"
     assert unit.PROCESSOR_NAME == "msi_pansharpen"
 
