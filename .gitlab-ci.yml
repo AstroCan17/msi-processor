@@ -385,8 +385,8 @@ product-stats:
     - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/e2es/s2-msi-raw-generator.git" /tmp/raw-generator
     - pip install -e /tmp/raw-generator
   script:
-    - python /tmp/raw-generator/scripts/run_e2e_l0_to_l1b.py results-store
-    - python scripts/product_stats.py results-store/l1b/L1B_TOA.zarr | tee product_stats.md
+    - python /tmp/raw-generator/scripts/run_pipeline.py results-store --synthetic
+    - python scripts/product_stats.py results-store/l1b/S02MSIL1B_*.zarr | tee product_stats.md
   artifacts:
     paths:
       - product_stats.md
