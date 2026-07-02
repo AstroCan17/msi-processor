@@ -85,9 +85,9 @@ def test_computing_model_is_loaded():
     """The CPM computing-model JSON declares the mandatory input and no ADFs."""
     model = CoregistrationUnit.processing_model()
     assert model is not None
-    assert set(CoregistrationUnit.get_available_modes()) == {"default"}
-    assert CoregistrationUnit.get_mandatory_input_list("default") == ["l1b"]
-    assert CoregistrationUnit.get_mandatory_adf_list("default") == []
+    assert set(CoregistrationUnit.get_available_modes()) == {"nominal"}
+    assert CoregistrationUnit.get_mandatory_input_list("nominal") == ["l1b"]
+    assert CoregistrationUnit.get_mandatory_adf_list("nominal") == []
 
 
 @pytest.mark.unit

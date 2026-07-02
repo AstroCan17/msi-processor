@@ -156,7 +156,7 @@ class PansharpenUnit(EOProcessingUnit):
         adfs:
             None required (the PAN band is carried by the L2A product).
         mode:
-            ``"default"`` (the only supported processing mode).
+            ``"nominal"`` (the only supported processing mode).
         **kwargs:
             ``enabled`` (``bool``, default ``True``; ``False`` fail-stops),
             ``method`` (fusion method, default ``"simple_mean"``), ``pan_band``
@@ -182,10 +182,10 @@ class PansharpenUnit(EOProcessingUnit):
             On a missing input / reflectance group or an unknown mode/method type.
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown pansharpen mode '{run_mode}'; expected 'default'",
+                f"Unknown pansharpen mode '{run_mode}'; expected 'nominal'",
                 stage=_STAGE,
             )
 
@@ -281,7 +281,7 @@ class PansharpenUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "method": method,

@@ -60,9 +60,9 @@ def test_computing_model_is_loaded():
     """The CPM computing-model JSON declares the mandatory input/ADFs."""
     model = ToaUnit.processing_model()
     assert model is not None
-    assert set(ToaUnit.get_available_modes()) == {"default"}
-    assert ToaUnit.get_mandatory_input_list("default") == ["enh"]
-    assert ToaUnit.get_mandatory_adf_list("default") == ["radiometric"]
+    assert set(ToaUnit.get_available_modes()) == {"nominal"}
+    assert ToaUnit.get_mandatory_input_list("nominal") == ["enh"]
+    assert ToaUnit.get_mandatory_adf_list("nominal") == ["radiometric"]
 
 
 @pytest.mark.unit

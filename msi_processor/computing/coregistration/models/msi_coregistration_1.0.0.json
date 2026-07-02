@@ -1,8 +1,8 @@
 {
-  "available_modes": ["default"],
-  "default_mode": "default",
+  "available_modes": ["nominal"],
+  "default_mode": "nominal",
   "modes_config": {
-    "default": {
+    "nominal": {
       "inputs": {
         "l1b": {"type": "product", "spec": {}}
       },

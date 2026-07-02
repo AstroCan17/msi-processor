@@ -162,7 +162,7 @@ class ToaUnit(EOProcessingUnit):
             ``radiometric`` (mandatory; gain/offset); ``spectral`` (required
             only when ``emit_reflectance`` is set; per-band ESUN).
         mode:
-            ``"default"`` (the only supported mode).
+            ``"nominal"`` (the only supported mode).
         **kwargs:
             :class:`TOAParams` fields (``emit_reflectance``, ``fill_value``);
             illumination geometry for reflectance (``sun_zenith_rad`` or
@@ -177,10 +177,10 @@ class ToaUnit(EOProcessingUnit):
             ``quality/mask/<band>``.
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown TOA mode '{run_mode}'; expected 'default'",
+                f"Unknown TOA mode '{run_mode}'; expected 'nominal'",
                 stage="toa",
             )
 
@@ -310,7 +310,7 @@ class ToaUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "emit_reflectance": params.emit_reflectance,

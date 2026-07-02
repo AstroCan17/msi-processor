@@ -220,7 +220,7 @@ class GeoreferenceUnit(EOProcessingUnit):
             ``viewing_model`` (mandatory), ``dem`` (mandatory), ``gcp`` (optional;
             required when ``use_gcp`` is set).
         mode:
-            ``"default"`` (the only supported mode).
+            ``"nominal"`` (the only supported mode).
         **kwargs:
             :class:`GeoreferenceParams` fields -- ``resolution`` (mandatory),
             ``crs`` (target CRS WKT; empty inherits the GCP-reference CRS),
@@ -243,10 +243,10 @@ class GeoreferenceUnit(EOProcessingUnit):
             rigorous path (``use_gcp=False``) -- fail-stop (REQ-F-GEO-03).
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown georeference mode '{run_mode}'; expected 'default'",
+                f"Unknown georeference mode '{run_mode}'; expected 'nominal'",
                 stage=_STAGE,
             )
 
@@ -474,7 +474,7 @@ class GeoreferenceUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "resolution": params.resolution,
