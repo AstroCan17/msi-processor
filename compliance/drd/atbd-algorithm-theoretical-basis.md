@@ -188,7 +188,10 @@ In `msi-processor` it is realised per profile.
 
 **Governing algorithm.**
 
-- **`ALG-L0-DEC` (decode/reformat).** A profile-bound codec maps source packets to
+- **`ALG-L0-DEC` (decode/reformat).** For the documented canonical (downlink) L0 — CCSDS
+  space packets carrying CCSDS-122 lossless payloads — the consumer-side `ground_decode`
+  reassembles the packet groups (sequence-flag grammar + counter continuity) and decodes the
+  CCSDS-122 stream bit-exactly (REQ-F-L0-06). For other forms a profile-bound codec maps source packets to
   $\{\mathrm{DN}^{(b)}_{l,d}\}$. Band $b$ with a higher native resolution (heritage: the panchromatic
   band, index 6, sampled at $2\times$) is reconstructed on its own grid; the detector/focal-plane
   layout (line order, flips) is applied from the profile so that $(l,d)$ is consistent across bands.
@@ -877,7 +880,7 @@ no private data, satisfying the report's confidentiality (REQ-HF-02).
 
 | ATBD algorithm(s) | SRS `REQ-*` | SSS `SYS-*` |
 |---|---|---|
-| ALG-L0-DEC, ALG-L0-LOSS | REQ-F-L0-01..05 | SYS-CAP-01 |
+| ALG-L0-DEC, ALG-L0-LOSS | REQ-F-L0-01..06 | SYS-CAP-01 |
 | ALG-RAD-NUC, ALG-RAD-DARK, ALG-RAD-BPR, ALG-RAD-SAT | REQ-F-RAD-01..05 | SYS-CAP-02 |
 | ALG-TOA-RAD, ALG-TOA-REF | REQ-F-TOA-01..03 | SYS-CAP-02, SYS-CAP-03 |
 | ALG-ENH-BWLP, -WAVE, -PCA, -MA, -GAUSS, -FFTDARK | REQ-F-ENH-01, REQ-F-ENH-03 | SYS-CAP-02 |

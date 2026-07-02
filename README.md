@@ -36,7 +36,7 @@ NUC from `dark` + `flatfield` acquisitions and emit it as a calibration product)
 
 ```mermaid
 flowchart TD
-    RAW[/"L0 downlink product<br/>(open-container Zarr)"/] -- "l0c" --> L0["l0_decode<br/>line-loss truncation · legality<br/>QA seed · telemetry"]:::done
+    RAW[/"L0 downlink product<br/>(canonical compressed-ISP or open-container Zarr)"/] -- "l0c" --> L0["l0_decode<br/>ground decode (reassemble + CCSDS-122)<br/>line-loss truncation · legality<br/>QA seed · telemetry"]:::done
     L0 -- "l1a" --> RAD["radiometric<br/>NUC · dark · BPR · saturation<br/>modes: nominal | calibration"]:::done
     RAD -- "rad" --> ENH["enhancement (mandatory)<br/>denoise · MTF compensation<br/>(PSF deconvolution)"]:::done
     RAD -. "nuc · calibration mode" .-> CAL[/"derived NUC<br/>calibration product"/]
@@ -64,16 +64,17 @@ flowchart TD
 reflectance is emitted; `georeference`'s `gcp` and `radiometric`'s `badpixel` are optional.
 
 **Implemented (CI-green):** the foundation (common types/metrics, exception hierarchy, sensor
-profile) and all eight processing units — `l0_decode` (Level-0 → L1A: line-loss truncation,
-legality, QA seeding, telemetry pass-through), `radiometric` (NUC / dark / BPR / saturation),
+profile) and all eight processing units — `l0_decode` (Level-0 → L1A: bit-exact ground decode of the
+canonical compressed-ISP form, line-loss truncation, legality, QA seeding, telemetry pass-through), `radiometric` (NUC / dark / BPR / saturation),
 `enhancement` (MTF compensation / PSF deconvolution + configurable denoise), `toa`
 (DN → radiance → reflectance), `coregister` (SIFT + homography), `georeference` (GCP refinement +
 cartographic-grid resampling) and `atmospheric` (6S TOA → BOA inversion + spectral-threshold scene
 classification with cloud / cloud-shadow masks) — the **L0c → L2A** chain — plus the optional,
 default-off `pansharpen` (**post-L2A** MS↔PAN fusion with per-band spectral-fidelity QA — runs after
 atmospheric correction, not at L1C) terminal derivative — each with synthetic unit tests. The
-sensor-private Level-0 source-packet decode body (the public path consumes the documented
-open-container sample layout), the rigorous viewing-model / DEM orthorectification, the
+sensor-private Level-0 source-packet decode body for non-documented on-wire forms (the public
+paths are the canonical compressed-ISP L0 — ground-decoded bit-exactly — and the open-container
+layout), the rigorous viewing-model / DEM orthorectification, the
 radiative-transfer engine that builds the atmospheric LUT, image-based atmospheric-parameter
 retrieval and the component-substitution fusion methods (Brovey / GS / IHS / à-trous; only
 simple-mean is operational) are private `[impl]` interfaces.
