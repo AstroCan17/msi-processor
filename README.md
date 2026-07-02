@@ -83,19 +83,34 @@ baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability ma
 QR data package (SVR, SUITR, SRN, CIDL, SCF + the QR review report) concluded **pass with
 actions** — the Tier-C numeric performance budgets are validated on operator data at AR.
 
-## Showcase — real L1B product
+## Results — real L0→L1B run
 
 Output of the real **L0→L1B** end-to-end run (`l0_decode → radiometric → enhancement → toa`,
-`eopf==2.8.1`): a persisted **L1B TOA-reflectance** EOPF product, produced from the
-**Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB ADFs
-(see `data/input/`).
+`eopf==2.8.1`, `nominal` mode): a persisted **L1B TOA-reflectance** EOPF product, produced from
+the **Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB ADFs
+(see `data/input/`). Full analysis on the docs site: *Results* page.
 
 ![L1B TOA reflectance quicklook](data/output/quicklook/l1b_rgb.png)
 
-RGB = B04/B03/B02, per-channel percentile stretch. The demo scene is a flat field (band-mean
-reflectance ≈ 0.19 VNIR / 0.27 NIR / 0.05 SWIR), so the stretch reveals the residual PRNU
-striping + noise texture rather than a landscape. Reproduce with the generator's
-`scripts/run_e2e_l0_to_l1b.py <data-store>` (or its manual `e2e-l1b` CI job).
+RGB = B04/B03/B02, per-channel percentile stretch. The demo scene is a flat field, so the
+stretch reveals the residual PRNU striping + noise texture rather than a landscape.
+
+Per-band statistics of the produced product (`scripts/product_stats.py`, the non-referential
+ALG-QA metrics of `msi_processor/common/metrics.py`):
+
+STATS_TABLE_PLACEHOLDER
+
+Reading them: the reflectance means are the levels impressed by the generator's flat-field
+scene — the absolute radiometric scale survives the full DN → radiance → reflectance chain;
+on a flat field the std *is* the residual instrument texture, so SNR ranks the bands by their
+noise model + PRNU amplitude. The **referential** accuracy figures (RMSE vs a calibrated
+reference — `RAD_ACC`, `GEO_CE90`/`BAND_COREG`, `BOA_ACC`) are AR-gated and validated on
+operator data (V&V report); `product_stats.py --reference` computes them when a reference is
+available. A second E2E result — the real-L1A **bit-identity** run through `l0_decode`
+(L1A′ ≡ L1A, 13/13 bands) — is documented in the generator's validation pages.
+
+Reproduce with the manual **`product-stats`** CI job (produces the L1B through the real chain
+and artifacts this table + quicklook), or the generator's `scripts/run_e2e_l0_to_l1b.py`.
 
 ## Project Structure
 
