@@ -66,6 +66,20 @@ baselined document set (SDP, SRS, SDD, ICD, DPM, ATBD, V&V Plan, traceability ma
 QR data package (SVR, SUITR, SRN, CIDL, SCF + the QR review report) concluded **pass with
 actions** — the Tier-C numeric performance budgets are validated on operator data at AR.
 
+## Showcase — real L1B product
+
+Output of the real **L0→L1B** end-to-end run (`l0_decode → radiometric → enhancement → toa`,
+`eopf==2.8.1`): a persisted **L1B TOA-reflectance** EOPF product, produced from the
+**Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB ADFs
+(see `data/input/`).
+
+![L1B TOA reflectance quicklook](data/output/quicklook/l1b_rgb.png)
+
+RGB = B04/B03/B02, per-channel percentile stretch. The demo scene is a flat field (band-mean
+reflectance ≈ 0.19 VNIR / 0.27 NIR / 0.05 SWIR), so the stretch reveals the residual PRNU
+striping + noise texture rather than a landscape. Reproduce with the generator's
+`scripts/run_e2e_l0_to_l1b.py <data-store>` (or its manual `e2e-l1b` CI job).
+
 ## Project Structure
 
 This project is organized as follows:
