@@ -74,8 +74,7 @@ def main() -> int:
         a = np.asarray(g[b])
         r = np.asarray(ref[b]) if ref is not None else None
         ms = compute_metrics(a, reference=r, bit_depth=args.bit_depth)
-        row = (f"| {b} | {float(a.mean()):.4f} | {float(a.std()):.4f} | "
-               f"{ms.variance:.6f} | {ms.snr:.1f} |")
+        row = f"| {b} | {float(a.mean()):.4f} | {float(a.std()):.4f} | {ms.variance:.6f} | {ms.snr:.1f} |"
         if ref is not None:
             row += f" {ms.rmse:.6f} | {ms.psnr:.1f} |"
         print(row)
