@@ -91,8 +91,8 @@ def _toa_scene() -> dict[str, np.ndarray]:
 def test_model_declares_input_and_adfs():
     """The computing-model JSON loads and declares l1c + dem mandatory."""
     unit = AtmosphericUnit("atm")
-    assert unit.get_mandatory_input_list("default") == ["l1c"]
-    assert unit.get_mandatory_adf_list("default") == ["dem"]
+    assert unit.get_mandatory_input_list("nominal") == ["l1c"]
+    assert unit.get_mandatory_adf_list("nominal") == ["dem"]
     assert unit.PROCESSOR_LEVEL == "L2A"
 
 

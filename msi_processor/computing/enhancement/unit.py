@@ -171,7 +171,7 @@ class EnhancementUnit(EOProcessingUnit):
             ``psf`` (mandatory; per-band MTFC deconvolution kernel); ``dark``
             (optional; required only for ``denoise_method="fft_dark"``).
         mode:
-            ``"default"`` (the only supported mode); the stage always runs.
+            ``"nominal"`` (the only supported mode); the stage always runs.
         **kwargs:
             :class:`EnhancementParams` fields (``denoise_method``,
             ``denoise_params``, ``bit_depth``, ``fill_value``,
@@ -185,10 +185,10 @@ class EnhancementUnit(EOProcessingUnit):
             ``quality/mask/<band>``.
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
-        if run_mode != "default":
+        run_mode = mode or "nominal"
+        if run_mode != "nominal":
             raise InputValidationError(
-                f"Unknown enhancement mode '{run_mode}'; expected 'default'",
+                f"Unknown enhancement mode '{run_mode}'; expected 'nominal'",
                 stage="enhancement",
             )
 
@@ -296,7 +296,7 @@ class EnhancementUnit(EOProcessingUnit):
             "processor": {
                 "name": self.PROCESSOR_NAME,
                 "version": self.PROCESSOR_VERSION,
-                "mode": "default",
+                "mode": "nominal",
             },
             "processing_parameters": {
                 "denoise_method": params.denoise_method,

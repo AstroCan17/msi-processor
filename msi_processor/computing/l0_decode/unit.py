@@ -59,7 +59,7 @@ _DETECTOR_GROUP = "measurements/detector"
 _CONDITIONS_GROUP = "conditions"
 _FLAGS_GROUP = "quality/l0_flags"
 _DIMS = ("line", "detector")
-_VALID_MODES = ("default",)
+_VALID_MODES = ("nominal",)
 _STAGE = "l0_decode"
 
 
@@ -123,7 +123,7 @@ class L0DecodeUnit(EOProcessingUnit):
         adfs:
             None — no auxiliary data is consumed at Level-0 (REQ-F-L0-01).
         mode:
-            ``"default"``.
+            ``"nominal"``.
         **kwargs:
             :class:`L0DecodeParams` fields plus optional ``name`` for the output.
 
@@ -133,7 +133,7 @@ class L0DecodeUnit(EOProcessingUnit):
             ``{"l1a": EOProduct}`` — detector DN, conditions, and ``l0_flags``.
         """
         logger = EOLogging().get_logger()
-        run_mode = mode or "default"
+        run_mode = mode or "nominal"
         if run_mode not in _VALID_MODES:
             raise InputValidationError(
                 f"Unknown l0_decode mode '{run_mode}'; expected one of {_VALID_MODES}",
