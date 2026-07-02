@@ -371,7 +371,7 @@ operational baseline never executes them.
 
 | # | Unit | Deferred function (algorithm) | Operational substitute |
 |---|---|---|---|
-| 1 | `l0_decode` | `decode_source_packets` (ALG-L0-DEC) — sensor-private on-wire source-packet decode/decompression | Public path consumes the documented open-container sample layout |
+| 1 | `l0_decode` | `decode_source_packets` (ALG-L0-DEC) — sensor-private on-wire forms only; the documented canonical L0 (compressed ISPs) now ground-decodes in `ground_decode` (REQ-F-L0-06) | Public paths: canonical L0 or the open-container sample layout |
 | 2 | `georeference` | `orbit_state` (ALG-GEO-ORBIT) — ephemeris/orbit propagation (CDR-target; GPL TLE path dropped) | — |
 | 3 | `georeference` | `orthorectify` (ALG-GEO-ORTHO) — rigorous collinearity / DEM line-of-sight (needs sensor-private viewing model; CDR-target) | Operational L1C uses GCP reference-image refinement; 2 xfail tests verify the fail-stop (CI-TS-08) |
 | 4 | `atmospheric` | `retrieve_atmospheric_parameters` (ALG-ATM-PAR) — image-based AOT/water-vapour retrieval | — |

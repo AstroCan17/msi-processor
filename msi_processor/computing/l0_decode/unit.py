@@ -64,10 +64,12 @@ _STAGE = "l0_decode"
 
 
 def _read_detector_frames(l0c: EOProduct, params: L0DecodeParams) -> dict[str, npt.NDArray[Any]]:
-    """Return decoded ``measurements/detector`` frames, or invoke the [impl] decode.
+    """Return decoded ``measurements/detector`` frames, or invoke the source-packet decode.
 
-    An L0c that already carries decoded frames is the public open-container path;
-    one that does not routes to the sensor-private decode (which fail-stops).
+    An L0c that already carries decoded frames is the open-container path; one that
+    does not routes to :func:`~msi_processor.computing.l0_decode.core.decode_source_packets`,
+    which ground-decodes the documented canonical (compressed-ISP) form bit-exactly
+    (REQ-F-L0-06) and fail-stops on sensor-private forms.
     """
     try:
         group = cast(EOGroup, l0c[_DETECTOR_GROUP])
@@ -102,7 +104,7 @@ class L0DecodeUnit(EOProcessingUnit):
     """
 
     PROCESSOR_NAME = "msi_l0_decode"
-    PROCESSOR_VERSION = "1.0.0"
+    PROCESSOR_VERSION = "1.1.0"
     PROCESSOR_LEVEL = "L1A"
     PROCESSOR_MODEL = True
 

@@ -99,6 +99,7 @@ CHUNK) are listed once in <5.3> and abbreviated here to the stage-distinctive on
 | REQ-F-L0-03 | Legality checks; resolve profile/ADF | SYS-CAP-01 | REQ-IF-IN-L0-02, REQ-IF-SEC-01 | C-PU-L0, C-COM-PROFILE, C-COM-ADF | DPM-M-L0 | ICD-IF-L0, ICD-IF-PROF | T·A | VT-1 |
 | REQ-F-L0-04 | Assemble self-describing `L1A` EOProduct | SYS-CAP-01 | REQ-IF-IN-L0-01, REQ-IF-OUT-02 | C-PU-L0, C-COM-PRODUCT | DPM-M-L0 | ICD-IF-OUT | T,I·A | VT-1 |
 | REQ-F-L0-05 | `L0` read-only | — | REQ-IF-IN-L0-03, REQ-IF-SEC-03 | C-PU-L0, C-COM-IO | DPM-M-L0 | ICD-IF-L0 | A,I·— | VT-9 |
+| REQ-F-L0-06 | Canonical L0 ground decode (bit-exact) | SYS-CAP-01 | REQ-IF-IN-L0-01 | C-PU-L0 (`ground_decode`) | DPM-M-L0 / ALG-L0-DEC | ICD-IF-L0 | T·— | VT-1 |
 | REQ-F-RAD-01 | Dark/DSNU subtraction | SYS-CAP-02 | REQ-IF-IN-ADF-01, REQ-IF-IN-ADF-02 | C-PU-RAD, C-COM-ADF | DPM-M-RAD / ALG-RAD-DARK | ICD-IF-ADF | T,A·A+C | VT-1,3 |
 | REQ-F-RAD-02 | NUC/PRNU flat-field | SYS-CAP-02 | REQ-IF-IN-ADF-01 | C-PU-RAD, C-COM-ADF | DPM-M-RAD / ALG-RAD-NUC | ICD-IF-ADF | T,A·A+C | VT-1,3 |
 | REQ-F-RAD-03 | Bad-pixel detect + replace + flag | SYS-CAP-02, SYS-OBS-02 | — | C-PU-RAD, C-COM-QAFLAG | DPM-M-RAD / ALG-RAD-BPR | — | T·A | VT-1 |
