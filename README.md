@@ -98,7 +98,14 @@ stretch reveals the residual PRNU striping + noise texture rather than a landsca
 Per-band statistics of the produced product (`scripts/product_stats.py`, the non-referential
 ALG-QA metrics of `msi_processor/common/metrics.py`):
 
-STATS_TABLE_PLACEHOLDER
+| Band | mean (refl.) | std | variance | SNR (dB) |
+|---|---|---|---|---|
+| B02 | 0.1753 | 0.0053 | 0.000029 | 30.3 |
+| B03 | 0.1888 | 0.0066 | 0.000044 | 29.1 |
+| B04 | 0.1911 | 0.0070 | 0.000049 | 28.7 |
+| B08 | 0.2648 | 0.0094 | 0.000089 | 29.0 |
+| B11 | 0.0434 | 0.0017 | 0.000003 | 28.3 |
+| B12 | 0.0535 | 0.0019 | 0.000004 | 28.8 |
 
 Reading them: the reflectance means are the levels impressed by the generator's flat-field
 scene — the absolute radiometric scale survives the full DN → radiance → reflectance chain;
