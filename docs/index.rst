@@ -28,19 +28,46 @@ Welcome to the msi-processor documentation!
    sum/index
    API Reference <api/msi_processor>
    Terms and Abbreviations <https://eopf.copernicus.eu/eopf-user-manuals-and-guidelines-for-the-processor-developers/>
-   srn
+   compliance/srn-software-release-note
    contributing
    license
 
 
 .. toctree::
    :maxdepth: 1
-   :caption: Project documentation:
+   :caption: ECSS technical specification & design:
 
-   sdd/index
-   dpm/index
-   icd
-   srf
+   compliance/sss-software-system-specification
+   compliance/ird-interface-requirements
+   compliance/srs-software-requirements
+   compliance/atbd-algorithm-theoretical-basis
+   compliance/sdd-software-design
+   compliance/djf-design-justification
+   compliance/dpm-data-processing-model
+   compliance/icd-interface-control
+   compliance/cidl-configuration-item-data-list
+   compliance/scf-software-configuration-file
+   compliance/srf-software-reuse-file
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: ECSS verification, validation & reviews:
+
+   compliance/vv-plan
+   compliance/suitp-unit-integration-test-plan
+   compliance/vv-report
+   compliance/suitr-unit-integration-test-report
    suitr
-   cidl
-   scf
+   compliance/traceability-matrix
+   compliance/qr-qualification-review-report
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: ECSS management & assurance:
+
+   compliance/software-development-plan
+   compliance/spa-plan
+   compliance/srevp-software-review-plan
+   compliance/risk-register

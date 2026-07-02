@@ -1,0 +1,1 @@
+../../compliance/drd/cidl-configuration-item-data-list.md

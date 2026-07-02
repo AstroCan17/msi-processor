@@ -119,6 +119,9 @@ today_fmt = "%d/%m/%Y %H:%M"
 # myst
 myst_enable_extensions = ["linkify"]
 myst_linkify_fuzzy_links = False
+# The ECSS compliance set (docs/compliance -> ../compliance) uses GitLab-style
+# ```mermaid fences; render them as {mermaid} directives instead of code blocks.
+myst_fence_as_directive = ["mermaid"]
 nitpicky = True
 
 # Avoid errors during generation. See:
