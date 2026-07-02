@@ -117,7 +117,7 @@ available. A second E2E result — the real-L1A **bit-identity** run through `l0
 (L1A′ ≡ L1A, 13/13 bands) — is documented in the generator's validation pages.
 
 Reproduce with the manual **`product-stats`** CI job (produces the L1B through the real chain
-and artifacts this table + quicklook), or the generator's `scripts/run_e2e_l0_to_l1b.py`.
+and artifacts this table + quicklook), or the generator's `scripts/run_pipeline.py --synthetic`.
 
 ## Project Structure
 
