@@ -65,8 +65,7 @@ def main() -> int:
     if ref is not None:
         header += " RMSE | PSNR (dB) |"
         sep += "---|---|"
-    print(f"Product : {os.path.basename(os.path.normpath(args.product))}  group={args.group}  "
-          f"bands={len(bands)}")
+    print(f"Product : {os.path.basename(os.path.normpath(args.product))}  group={args.group}  bands={len(bands)}")
     print()
     print(header)
     print(sep)
