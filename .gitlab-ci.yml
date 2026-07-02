@@ -378,6 +378,7 @@ integration-tests:
 product-stats:
   stage: integration tests
   timeout: 30m
+  needs: []
   before_script:
     - pip install .
     - rm -rf /tmp/raw-generator
