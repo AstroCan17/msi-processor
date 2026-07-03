@@ -493,8 +493,8 @@ def phase_cal_decode(store: dict[str, Path], ctx: dict[str, Any], args: argparse
 
     The campaign arrives exactly like any downlink: canonical L0 products
     ``S02MSIDCA…zarr`` / ``S02MSISCA…zarr`` (CCSDS-122 compressed ISPs) pulled from the
-    data-store. Each is decoded through :class:`L0DecodeUnit` — the REQ-F-L0-06 ground
-    decode in operational use.
+    data-store — under ``caldb/`` (legacy stores/packages: ``l0/``). Each is decoded
+    through :class:`L0DecodeUnit` — the REQ-F-L0-06 ground decode in operational use.
     """
     import zarr
     from eopf.product import EOProduct, EOVariable
@@ -502,9 +502,11 @@ def phase_cal_decode(store: dict[str, Path], ctx: dict[str, Any], args: argparse
     from msi_processor.computing.l0_decode.unit import L0DecodeUnit
 
     def _decode(prefix: str) -> tuple[Any, dict[str, np.ndarray]]:
-        hits = sorted(store["l0"].glob(f"{prefix}*.zarr"))
+        hits = sorted(store["caldb"].glob(f"{prefix}*.zarr")) or sorted(store["l0"].glob(f"{prefix}*.zarr"))
         if not hits:
-            raise SystemExit(f"[cal-decode] no {prefix}* product under {store['l0']} (fetch-store first)")
+            raise SystemExit(
+                f"[cal-decode] no {prefix}* product under {store['caldb']} or {store['l0']} (fetch-store first)"
+            )
         g = zarr.open_group(str(hits[0]), mode="r")
         prod = EOProduct(hits[0].name.removesuffix(".zarr"))
         for dname, det in g["measurements"].groups():
