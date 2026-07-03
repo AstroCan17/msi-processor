@@ -380,6 +380,8 @@ pipeline-nominal:
   before_script:
     - pip install .
   script:
+    # the shell runner persists the workspace — start from a clean store each run
+    - rm -rf results-store
     - python scripts/run_pipeline.py results-store --mode nominal --bit-depth 16
   artifacts:
     paths:
@@ -396,6 +398,7 @@ pipeline-calibration:
   before_script:
     - pip install .
   script:
+    - rm -rf results-store
     - python scripts/run_pipeline.py results-store --mode calibration
   artifacts:
     paths:
