@@ -640,9 +640,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--l0", default=None, help="substring selecting the input L0 when several are present")
     ap.add_argument(
         "--fetch-packages",
-        default="synthetic,calibration",
+        default=None,
         dest="fetch_packages",
-        help="comma list of data-store packages fetch-store pulls (empty = all)",
+        help="comma list of data-store packages fetch-store pulls "
+        "(default: nominal-sample for nominal, cal-campaign for calibration; empty = all)",
     )
     ap.add_argument("--publish-name", default="msi-products", dest="publish_name")
     ap.add_argument("--publish-version", default=None, dest="publish_version")
