@@ -135,7 +135,7 @@ EOPF PSFD §3 names).
 |---|---|---|
 | **`--mode nominal`** (default) | `fetch-store → l0-decode → radiometric → enhancement → toa → stats → report` | PSFD-named L1A + L1B (TOA reflectance) + QA statistics |
 | nominal + **`--full`** | … `toa → coregister → georeference → atmospheric → pansharpen → stats …` | + L1C / L2A (demo geo/atmospheric ADFs — flagged in the report) |
-| **`--mode calibration`** | `fetch-store → l0-decode → radiometric-cal → cal-validate → report` | derived-NUC product (PSFD `_NUC`) + consumer-vs-producer coefficient cross-check |
+| **`--mode calibration`** | `fetch-store → cal-decode → radiometric-cal → cal-validate → report` | derived-NUC product (PSFD `_NUC`) + consumer-vs-producer coefficient cross-check |
 
 ```bash
 python scripts/run_pipeline.py <store>                        # nominal chain

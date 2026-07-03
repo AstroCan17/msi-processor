@@ -65,7 +65,7 @@ import numpy as np
 # PSFD naming (minimal composer; authority: s2_msi_raw_generator.naming)
 # ---------------------------------------------------------------------------
 
-TYPE_CODES = ("S02MSIL0_", "S02MSIL1A", "S02MSIL1B", "S02MSIL1C", "S02MSIL2A")
+TYPE_CODES = ("S02MSIL0_", "S02MSIL1A", "S02MSIL1B", "S02MSIL1C", "S02MSIL2A", "S02MSIDCA", "S02MSISCA")
 _NAME_RE = re.compile(
     r"^(?P<product_type>[A-Z0-9_]{9})_(?P<start>\d{8}T\d{6})_(?P<duration>\d{4})"
     r"_(?P<unit>[A-Z])(?P<relative_orbit>\d{3})_(?P<consolidation>[T_S])(?P<discriminator>[0-9A-F]{3})"
@@ -125,6 +125,7 @@ PHASES = [
     "georeference",
     "atmospheric",
     "pansharpen",
+    "cal-decode",
     "radiometric-cal",
     "cal-validate",
     "stats",
@@ -133,7 +134,7 @@ PHASES = [
 ]
 NOMINAL_PHASES = ["fetch-store", "l0-decode", "radiometric", "enhancement", "toa", "stats", "report"]
 FULL_EXTRA = ["coregister", "georeference", "atmospheric", "pansharpen"]
-CALIBRATION_PHASES = ["fetch-store", "l0-decode", "radiometric-cal", "cal-validate", "report"]
+CALIBRATION_PHASES = ["fetch-store", "cal-decode", "radiometric-cal", "cal-validate", "report"]
 
 
 def _store_paths(store: Path) -> dict[str, Path]:
@@ -372,7 +373,7 @@ def phase_radiometric(store: dict[str, Path], ctx: dict[str, Any], args: argpars
         ),
         "dark": _adf("dark", {"dark_offset": {b: float(np.asarray(dz[f"dark_offset/{b}"])) for b in bands}}),
     }
-    ctx["rad"] = RadiometricUnit("rad").run({"l1a": ctx["l1a"]}, adfs=adfs)["rad"]
+    ctx["rad"] = RadiometricUnit("rad").run({"l1a": ctx["l1a"]}, adfs=adfs, bit_depth=args.bit_depth)["rad"]
     print(f"[radiometric] nominal NUC applied ({len(bands)} bands)")
 
 
@@ -487,31 +488,70 @@ def phase_pansharpen(store: dict[str, Path], ctx: dict[str, Any], args: argparse
     print("[pansharpen] PAN-fused derivative persisted")
 
 
-def phase_radiometric_cal(store: dict[str, Path], ctx: dict[str, Any], args: argparse.Namespace) -> None:
-    """Calibration mode: derive the NUC from the producer's dark+flatfield acquisitions."""
-    import zarr
+def phase_cal_decode(store: dict[str, Path], ctx: dict[str, Any], args: argparse.Namespace) -> None:
+    """Ground-decode the calibration-campaign L0 products (dark DASC + sun-diffuser ABSR).
 
+    The campaign arrives exactly like any downlink: canonical L0 products
+    ``S02MSIDCA…zarr`` / ``S02MSISCA…zarr`` (CCSDS-122 compressed ISPs) pulled from the
+    data-store. Each is decoded through :class:`L0DecodeUnit` — the REQ-F-L0-06 ground
+    decode in operational use.
+    """
+    import zarr
+    from eopf.product import EOProduct, EOVariable
+
+    from msi_processor.computing.l0_decode.unit import L0DecodeUnit
+
+    def _decode(prefix: str) -> tuple[Any, dict[str, np.ndarray]]:
+        hits = sorted(store["l0"].glob(f"{prefix}*.zarr"))
+        if not hits:
+            raise SystemExit(f"[cal-decode] no {prefix}* product under {store['l0']} (fetch-store first)")
+        g = zarr.open_group(str(hits[0]), mode="r")
+        prod = EOProduct(hits[0].name.removesuffix(".zarr"))
+        for dname, det in g["measurements"].groups():
+            for bname, grp in det.groups():
+                prod[f"measurements/{dname}/{bname}/isp"] = EOVariable(data=np.asarray(grp["isp"]), dims=("byte",))
+        if "conditions/time/line_time" in g:
+            prod["conditions/time/line_time"] = EOVariable(
+                data=np.asarray(g["conditions/time/line_time"]), dims=("line",)
+            )
+        l1a = L0DecodeUnit("l0").run({"l0c": prod}, bit_depth=args.bit_depth)["l1a"]
+        frames = {
+            name: np.asarray(var.data).astype(np.float64)
+            for name, var in l1a["measurements/detector"].items()  # type: ignore[union-attr]
+        }
+        ctx.setdefault("cal_products", {})[prefix] = hits[0].name
+        return l1a, frames
+
+    _, dark_frames = _decode("S02MSIDCA")
+    diffuser_l1a, flat_frames = _decode("S02MSISCA")
+    ctx["dark_frames"] = dark_frames
+    ctx["flat_frames"] = flat_frames
+    ctx["l1a"] = diffuser_l1a  # the NUC is derived on the diffuser datatake
+    ctx["l0_fields"] = parse_psfd_name(ctx["cal_products"]["S02MSISCA"])
+    ctx["cal_bands"] = sorted(set(dark_frames) & set(flat_frames))
+    print(
+        f"[cal-decode] dark {ctx['cal_products']['S02MSIDCA']} + "
+        f"diffuser {ctx['cal_products']['S02MSISCA']} → {len(ctx['cal_bands'])} bands"
+    )
+
+
+def phase_radiometric_cal(store: dict[str, Path], ctx: dict[str, Any], args: argparse.Namespace) -> None:
+    """Calibration mode: derive the NUC from the decoded campaign acquisitions."""
     from msi_processor.computing.radiometric.unit import RadiometricUnit
 
-    caldir = store["inputs"] / "calibration"
-    if not (caldir / "flatfield.zarr").exists():
-        raise SystemExit(f"[radiometric-cal] no calibration acquisitions under {caldir} (fetch-store first)")
-    flat = zarr.open_group(str(caldir / "flatfield.zarr"), mode="r")
-    dark = zarr.open_group(str(caldir / "dark.zarr"), mode="r")
-    bands = [b for b in ctx["bands"] if b in flat.array_keys()]
+    bands = ctx["cal_bands"]
     adfs = {
         "dark": _adf(
             "dark",
             {
-                "frame": {b: np.asarray(dark[f"frame/{b}"]) for b in bands},
-                "dark_offset": {b: float(np.asarray(dark[f"dark_offset/{b}"])) for b in bands},
+                "frame": {b: ctx["dark_frames"][b] for b in bands},
+                "dark_offset": {b: float(ctx["dark_frames"][b].mean()) for b in bands},
             },
         ),
-        "flatfield": _adf("flatfield", {b: np.asarray(flat[b]) for b in bands}),
+        "flatfield": _adf("flatfield", {b: ctx["flat_frames"][b] for b in bands}),
     }
     outputs = RadiometricUnit("rad").run({"l1a": ctx["l1a"]}, adfs=adfs, mode="calibration")
     ctx["nuc_derived"] = outputs["nuc"]
-    ctx["cal_bands"] = bands
     path = _persist(outputs["nuc"], store["nuc"], _out_name(ctx, "S02MSIL1A", z_suffix="NUC"))
     print(f"[radiometric-cal] derived NUC ({len(bands)} bands) → {path}")
 
@@ -520,7 +560,7 @@ def phase_cal_validate(store: dict[str, Path], ctx: dict[str, Any], args: argpar
     """Consumer-derived NUC vs the producer-derived coefficients (closing the cal loop)."""
     import zarr
 
-    prod_nuc = zarr.open_group(str(store["inputs"] / "calibration" / "nuc.zarr"), mode="r")
+    prod_nuc = zarr.open_group(str(store["caldb"] / "nuc.zarr"), mode="r")
     res: dict[str, Any] = {}
     for b in ctx["cal_bands"]:
         g_c = np.asarray(ctx["nuc_derived"][f"gain/{b}"].data, dtype=np.float64)
@@ -534,8 +574,8 @@ def phase_cal_validate(store: dict[str, Path], ctx: dict[str, Any], args: argpar
         }
         print(f"[cal-validate] {b}: gain RMSE={res[b]['gain_rmse']:.4g} max_rel={res[b]['gain_max_rel']:.3%}")
     res["_note"] = (
-        "consumer derives gain = mean(F)/colmean(F) (no dark subtraction); the producer's "
-        "two-point NUC subtracts the dark acquisition — small systematic differences are expected"
+        "both sides derive the two-point NUC from the SAME campaign acquisitions (the L0 "
+        "carrier is bit-exact), so agreement to float32 storage precision is expected"
     )
     _jdump(res, store["report"] / "cal_validate.json")
 
@@ -609,6 +649,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--publish-source", default="msi-processor run_pipeline", dest="publish_source")
     args = ap.parse_args(argv)
 
+    if args.fetch_packages is None:
+        args.fetch_packages = "cal-campaign" if args.mode == "calibration" else "nominal-sample"
     if args.phases:
         todo = [p.strip() for p in args.phases.split(",") if p.strip()]
     elif args.mode == "calibration":
@@ -634,6 +676,7 @@ def main(argv: list[str] | None = None) -> int:
         "georeference": phase_georeference,
         "atmospheric": phase_atmospheric,
         "pansharpen": phase_pansharpen,
+        "cal-decode": phase_cal_decode,
         "radiometric-cal": phase_radiometric_cal,
         "cal-validate": phase_cal_validate,
         "stats": phase_stats,
