@@ -55,7 +55,7 @@ def test_packets_tile_the_stream_and_carry_cuc(stream):
     pkts = list(ground_decode.iter_packets(stream))
     assert len(pkts) == 3
     covered = sum(ground_decode.PRIMARY_HEADER_LEN + h["data_len"] + 1 for h, _, _ in pkts)
-    assert covered == stream.size                       # well-formed iff packets tile exactly
+    assert covered == stream.size  # well-formed iff packets tile exactly
     assert all(cuc is not None and cuc > 0 for _, cuc, _ in pkts)
     seqs = [h["seq_count"] for h, _, _ in pkts]
     assert seqs == [(seqs[0] + i) % ground_decode.SEQ_COUNT_MOD for i in range(len(seqs))]
@@ -65,7 +65,7 @@ def test_sequence_gap_is_rejected(stream):
     corrupt = stream.copy()
     pkts = list(ground_decode.iter_packets(stream))
     second_off = ground_decode.PRIMARY_HEADER_LEN + pkts[0][0]["data_len"] + 1
-    corrupt[second_off + 3] ^= 0x01                     # flip a seq_count bit of packet 2
+    corrupt[second_off + 3] ^= 0x01  # flip a seq_count bit of packet 2
     with pytest.raises(ValueError, match="sequence gap"):
         ground_decode.reassemble_segments(corrupt)
 
