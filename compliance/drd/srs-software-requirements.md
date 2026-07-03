@@ -240,6 +240,12 @@ Functional requirements implement SSS capabilities `SYS-CAP-*` and the staged in
 - **REQ-F-L0-05** — The software shall treat the `L0` input as **read-only** and shall not modify
   it.
   *Trace:* REQ-IF-IN-L0-03, REQ-IF-SEC-03. *Verify:* A, I.
+- **REQ-F-L0-06** — The software shall ground-decode the documented **canonical (downlink) L0**
+  form — CCSDS space packets carrying CCSDS-122 lossless payloads
+  (`measurements/d{DD}/b{bb}/isp`) — into the exact detector DN frames (bit-exact), enforcing the
+  packet sequence-flag grammar and 14-bit counter continuity; any other on-wire form shall
+  fail-stop as sensor-private `[impl]`.
+  *Trace:* SYS-CAP-01, REQ-IF-IN-L0-01. *Verify:* T.
 
 #### <5.2.2> Radiometric correction — dark, NUC/PRNU, BPR (`L1A` →)
 
@@ -763,6 +769,7 @@ T/A/I/R.)*
 | REQ-F-L0-02 | T | Inject line/packet loss; assert truncation + QA flag |
 | REQ-F-L0-03 | T | Malformed/mismatched input → reject/flag; profile/ADF resolution test |
 | REQ-F-L0-05 | A, I | Static analysis / inspection: no write path to `L0` |
+| REQ-F-L0-06 | T | Producer-generated compressed-ISP fixture → ground decode; assert bit-exact DN + grammar/continuity rejects |
 | REQ-F-RAD-01, -02 | T, A | Unit test on synthetic + local real data vs DPM expected response |
 | REQ-F-RAD-03, -04 | T | Bad-pixel/saturation fixtures → replacement + QA flags |
 | REQ-F-RAD-05 | T, A | Derive gain/offset from dark+flat fixtures; compare to reference (local) |

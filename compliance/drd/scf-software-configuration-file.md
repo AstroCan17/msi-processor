@@ -445,7 +445,7 @@ G-1/G-6); the operational baseline never executes them:
 
 | # | Unit / algorithm | Reason |
 |---|---|---|
-| 1 | `l0_decode` `decode_source_packets` (`ALG-L0-DEC`) | Sensor-private on-wire source-packet decode/decompression; public path consumes the documented open-container sample layout |
+| 1 | `l0_decode` `decode_source_packets` (`ALG-L0-DEC`) | Sensor-private on-wire forms only; the documented canonical L0 ground-decodes in `ground_decode` (REQ-F-L0-06); open-container path unchanged |
 | 2 | `georeference` `orbit_state` (`ALG-GEO-ORBIT`) | Ephemeris/orbit propagation (CDR-target; GPL TLE path dropped) |
 | 3 | `georeference` `orthorectify` (`ALG-GEO-ORTHO`) | Rigorous collinearity/DEM line-of-sight needs the sensor-private viewing model (CDR-target); operational L1C uses GCP reference-image refinement; 2 xfail tests verify the fail-stop |
 | 4 | `atmospheric` `retrieve_atmospheric_parameters` (`ALG-ATM-PAR`) | Image-based AOT/water-vapour retrieval |

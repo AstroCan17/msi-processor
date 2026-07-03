@@ -615,7 +615,9 @@ parameters and modes differ and are given below.
 
 **Identifier/type.** `msi_processor.computing.l0_decode`; PU (`core`+`unit`); `PROCESSOR_LEVEL="L1A"`.
 **Purpose & trace.** Decode the `L0c` stream to per-band/per-detector focal-plane arrays, detect/handle
-line loss, assemble the `L1A` `EOProduct`. *Trace:* REQ-F-L0-01..05; DPM-M-L0; ALG-L0-DEC/LOSS;
+line loss, assemble the `L1A` `EOProduct`; the `ground_decode` module implements the consumer-side
+canonical-L0 decompression (reassemble + CCSDS-122 decode, bit-exact — the real-chain L1A-side
+operation). *Trace:* REQ-F-L0-01..06; DPM-M-L0; ALG-L0-DEC/LOSS;
 ICD-IF-L0-*.
 
 **Pure-core — signatures & data structures** (`l0_decode.core`):
@@ -626,7 +628,9 @@ class LineLoss:                       # per-band loss record -> processing repor
     band: str; start_line: int; n_lost: int
 
 def decode(raw: "RawL0", codec: "CodecSpec") -> dict[str, np.ndarray]:
-    """ALG-L0-DEC. Map L0c source packets to {band: DN[line, detector]} in focal-plane
+    """ALG-L0-DEC. Ground-decode the documented canonical L0 (CCSDS space packets
+    carrying CCSDS-122 lossless payloads) bit-exactly via `ground_decode` (REQ-F-L0-06);
+    map other L0c source packets to {band: DN[line, detector]} in focal-plane
     geometry, applying the profile focal-plane layout (line order / flips, per-band line_factor).
     Body is sensor/NDA-specific and profile-bound -> [impl]; heritage Decoder.decode is a stub."""
 

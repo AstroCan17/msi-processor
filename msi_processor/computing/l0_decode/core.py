@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from struct import error as struct_error
 from typing import Any, Optional
 
 import numpy as np
@@ -185,18 +186,57 @@ def initial_qa(band: npt.NDArray[Any], params: L0DecodeParams) -> QAArray:
     return qa
 
 
+def _canonical_band_streams(raw: Any) -> dict[str, dict[str, npt.NDArray[np.uint8]]]:
+    """Collect ``d{DD}/b{bb} -> {"isp": stream}`` from a canonical L0 product (duck-typed).
+
+    Walks ``measurements/d*/b*`` groups of the input product (EOProduct or any nested
+    mapping) and returns the uint8 packet streams; empty when the product carries no
+    canonical band groups (i.e. it is not the documented downlink form).
+    """
+    streams: dict[str, dict[str, npt.NDArray[np.uint8]]] = {}
+    try:
+        meas = raw["measurements"]
+        items = meas.items()
+    except (KeyError, TypeError, AttributeError):
+        return streams
+    for dname, det in items:
+        if not (isinstance(dname, str) and dname.startswith("d") and hasattr(det, "items")):
+            continue
+        for bname, grp in det.items():
+            try:
+                var = grp["isp"]
+            except (KeyError, TypeError):
+                continue
+            stream = np.asarray(getattr(var, "data", var), dtype=np.uint8)
+            streams[f"{dname}/{bname}"] = {"isp": stream}
+    return streams
+
+
 def decode_source_packets(raw: Any, codec_spec: Any) -> dict[str, IntArray]:
     """ALG-L0-DEC — reassemble/decompress source packets to detector frames.
 
-    The on-wire packetisation, bit-ordering and decompression are
-    sensor/NDA-specific and profile-bound: this body is a private ``[impl]``
-    backend that is *not* part of this public distribution. The operational and
-    simulator paths instead supply already-decoded *open-container* detector
-    frames (see :mod:`~msi_processor.computing.l0_decode.unit`).
+    The **documented open downlink form** — the producer's canonical L0
+    (``measurements/d{DD}/b{bb}/isp``: CCSDS space packets carrying CCSDS-122
+    lossless payloads) — is ground-decoded here bit-exactly
+    (:mod:`~msi_processor.computing.l0_decode.ground_decode`, REQ-F-L0D-06): the
+    real-chain L1A-side decompression now lives in the consumer.
+
+    Any *other* on-wire packetisation remains sensor/NDA-specific and
+    profile-bound: that body is a private ``[impl]`` backend not part of this
+    public distribution, and fail-stops below.
     """
+    from msi_processor.computing.l0_decode import ground_decode
+
+    streams = _canonical_band_streams(raw)
+    if streams:
+        try:
+            frames = ground_decode.decode_canonical_frames(streams)
+        except (ValueError, struct_error) as exc:
+            raise L0DecodeError(f"canonical L0 ground decode failed: {exc}", stage=_STAGE) from exc
+        return {b: np.asarray(f, dtype=np.uint16) for b, f in frames.items()}
     raise L0DecodeError(
         "the Level-0 source-packet decode body is sensor-private and profile-bound "
-        "([impl]); supply already-decoded open-container detector frames or bind "
-        "the private decode backend for the active profile",
+        "([impl]); supply the documented canonical L0 (compressed ISPs) or "
+        "already-decoded open-container detector frames",
         stage=_STAGE,
     )
