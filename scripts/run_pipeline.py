@@ -198,8 +198,11 @@ def phase_fetch_store(store: dict[str, Path], ctx: dict[str, Any], args: argpars
 
     root = store["report"].parent
     manifest = json.loads(_http(f"{DATASTORE_API}/manifest/latest/manifest.json").decode())
+    wanted = {n.strip() for n in args.fetch_packages.split(",") if n.strip()}
     fetched = skipped = 0
     for pkg in manifest.get("packages", []):
+        if wanted and pkg["name"] not in wanted:
+            continue
         for f in pkg["files"]:
             target = root / (f["path"][:-4] if f["path"].endswith(".zip") else f["path"])
             if target.is_file() or (target.is_dir() and any(target.iterdir())):
@@ -306,13 +309,17 @@ def _persist(product: Any, out_dir: Path, name: str) -> str:
     return str(out_dir / name)
 
 
-def _l0_context(store: dict[str, Path]) -> dict[str, Any]:
+def _l0_context(store: dict[str, Path], args: argparse.Namespace) -> dict[str, Any]:
     """Fields of the input L0's PSFD name, reused for this run's product names."""
     ocs = sorted(store["l0"].glob("*_OC.zarr")) or sorted(store["l0"].glob("*.zarr"))
+    if args.l0:
+        ocs = [p for p in ocs if args.l0 in p.name]
     if not ocs:
         raise SystemExit(f"[l0-decode] no L0 product under {store['l0']} (run fetch-store first)")
-    fields = parse_psfd_name(ocs[-1].name)
-    fields["l0_path"] = str(ocs[-1])
+    if len(ocs) > 1:
+        print(f"[l0-decode] {len(ocs)} L0 candidates; using {ocs[0].name} (select with --l0)")
+    fields = parse_psfd_name(ocs[0].name)
+    fields["l0_path"] = str(ocs[0])
     return fields
 
 
@@ -328,7 +335,7 @@ def phase_l0_decode(store: dict[str, Path], ctx: dict[str, Any], args: argparse.
 
     from msi_processor.computing.l0_decode.unit import L0DecodeUnit
 
-    ctx["l0_fields"] = _l0_context(store)
+    ctx["l0_fields"] = _l0_context(store, args)
     g = zarr.open_group(ctx["l0_fields"]["l0_path"], mode="r")
     prod = EOProduct("L0C")
     if "measurements/detector" in g:
@@ -342,7 +349,7 @@ def phase_l0_decode(store: dict[str, Path], ctx: dict[str, Any], args: argparse.
                 prod[f"measurements/{dname}/{bname}/isp"] = EOVariable(data=np.asarray(grp["isp"]), dims=("byte",))
     if "conditions/time/line_time" in g:
         prod["conditions/time/line_time"] = EOVariable(data=np.asarray(g["conditions/time/line_time"]), dims=("line",))
-    l1a = L0DecodeUnit("l0").run({"l0c": prod})["l1a"]
+    l1a = L0DecodeUnit("l0").run({"l0c": prod}, bit_depth=args.bit_depth)["l1a"]
     ctx["l1a"] = l1a
     ctx["bands"] = sorted(name for name, _ in l1a["measurements/detector"].items())  # type: ignore[union-attr]
     path = _persist(l1a, store["l1a"], _out_name(ctx, "S02MSIL1A"))
@@ -590,6 +597,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--phases", default=None, help=f"comma list from {PHASES}")
     ap.add_argument("--sun-zenith-deg", type=float, default=35.0, dest="sun_zenith_deg")
     ap.add_argument("--bit-depth", type=int, default=12, dest="bit_depth")
+    ap.add_argument("--l0", default=None, help="substring selecting the input L0 when several are present")
+    ap.add_argument(
+        "--fetch-packages",
+        default="synthetic,calibration",
+        dest="fetch_packages",
+        help="comma list of data-store packages fetch-store pulls (empty = all)",
+    )
     ap.add_argument("--publish-name", default="msi-products", dest="publish_name")
     ap.add_argument("--publish-version", default=None, dest="publish_version")
     ap.add_argument("--publish-source", default="msi-processor run_pipeline", dest="publish_source")
