@@ -611,8 +611,10 @@ def phase_stats(store: dict[str, Path], ctx: dict[str, Any], args: argparse.Name
 def phase_report(store: dict[str, Path], ctx: dict[str, Any], args: argparse.Namespace) -> None:
     rep = store["report"]
     lines = [f"# msi-processor pipeline report ({args.mode} mode)", ""]
-    if ctx.get("l0_fields"):
+    if ctx.get("l0_fields", {}).get("l0_path"):
         lines += [f"- L0 input: `{Path(ctx['l0_fields']['l0_path']).name}`"]
+    for kind, name in ctx.get("cal_products", {}).items():
+        lines += [f"- calibration L0 ({kind}): `{name}`"]
     for key in ("l1b_path", "l1c_path", "l2a_path"):
         if ctx.get(key):
             lines += [f"- {key.split('_')[0]}: `{Path(ctx[key]).name}`"]
