@@ -45,19 +45,19 @@ __all__ = [
     "parse_primary_header",
 ]
 
-PRIMARY_HEADER_LEN = 6   # CCSDS Space Packet primary header (octets)
-CUC_TIME_LEN = 6         # secondary header: 4-octet coarse + 2-octet fine (CUC)
-SEQ_STANDALONE = 0b11    # unsegmented (standalone) packet
-SEQ_FIRST = 0b01         # first packet of a segmented group
-SEQ_CONT = 0b00          # continuation packet
-SEQ_LAST = 0b10          # last packet of a segmented group
+PRIMARY_HEADER_LEN = 6  # CCSDS Space Packet primary header (octets)
+CUC_TIME_LEN = 6  # secondary header: 4-octet coarse + 2-octet fine (CUC)
+SEQ_STANDALONE = 0b11  # unsegmented (standalone) packet
+SEQ_FIRST = 0b01  # first packet of a segmented group
+SEQ_CONT = 0b00  # continuation packet
+SEQ_LAST = 0b10  # last packet of a segmented group
 SEQ_COUNT_MOD = 1 << 14  # 14-bit sequence counter
 
 #: Canonical L0 band-group path pattern: measurements/d{DD}/b{bb} (b8a for B8A).
 _CANONICAL_RE = re.compile(r"^d(\d{2})/(b[0-9a-z]{2,3})$")
 
 
-def parse_primary_header(b: bytes) -> dict:
+def parse_primary_header(b: bytes) -> dict[str, int]:
     """CCSDS Space Packet primary header → field dict (decode direction)."""
     w0 = (b[0] << 8) | b[1]
     w1 = (b[2] << 8) | b[3]
@@ -80,24 +80,24 @@ def _parse_cuc_time(b: bytes) -> float:
     return coarse + fine / 65536.0
 
 
-def iter_packets(buf: bytes | np.ndarray) -> Iterator[tuple[dict, float | None, bytes]]:
+def iter_packets(buf: bytes | np.ndarray) -> Iterator[tuple[dict[str, int], float | None, bytes]]:
     """Iterate CCSDS packets in a concatenated stream → ``(header, cuc_seconds, body)``.
 
     The primary header's *Packet Data Length* field walks the stream; a stream is
     well-formed iff packets tile it exactly. ``body`` excludes the CUC secondary header.
     """
-    data = (bytes(bytearray(np.asarray(buf, dtype=np.uint8)))
-            if not isinstance(buf, (bytes, memoryview)) else bytes(buf))
+    data = bytes(bytearray(np.asarray(buf, dtype=np.uint8))) if not isinstance(buf, (bytes, memoryview)) else bytes(buf)
     pos = 0
     while pos < len(data):
         if pos + PRIMARY_HEADER_LEN > len(data):
             raise ValueError(f"truncated primary header at offset {pos}")
-        hdr = parse_primary_header(data[pos:pos + PRIMARY_HEADER_LEN])
+        hdr_end = pos + PRIMARY_HEADER_LEN
+        hdr = parse_primary_header(data[pos:hdr_end])
         dlen = hdr["data_len"] + 1
         end = pos + PRIMARY_HEADER_LEN + dlen
         if end > len(data):
             raise ValueError(f"packet at offset {pos} overruns the stream")
-        field = data[pos + PRIMARY_HEADER_LEN:end]
+        field = data[hdr_end:end]
         has_cuc = hdr["sec_hdr_flag"] and dlen >= CUC_TIME_LEN
         cuc = _parse_cuc_time(field[:CUC_TIME_LEN]) if has_cuc else None
         body = field[CUC_TIME_LEN:] if has_cuc else field
@@ -160,7 +160,7 @@ def decode_canonical_frames(band_groups: dict[str, Any]) -> dict[str, np.ndarray
         m = _CANONICAL_RE.match(path)
         if not m:
             continue
-        band = m.group(2).upper()          # b04 -> B04, b8a -> B8A
+        band = m.group(2).upper()  # b04 -> B04, b8a -> B8A
         frames[band] = decode_stream(np.asarray(grp["isp"]))
     if not frames:
         raise ValueError("no canonical d{DD}/b{bb}/isp band groups found")
@@ -171,7 +171,7 @@ def decode_canonical_l0(path: str, detector: int, band: str) -> np.ndarray:
     """Path-based helper: canonical L0 zarr → one band's bit-exact DN frame."""
     import zarr
 
-    key = "b" + band[1:].lower()           # B03 -> b03, B8A -> b8a (producer convention)
+    key = "b" + band[1:].lower()  # B03 -> b03, B8A -> b8a (producer convention)
     g = zarr.open_group(str(path), mode="r")
     mg = g[f"measurements/d{detector:02d}/{key}"]
     return decode_stream(np.asarray(mg["isp"]))

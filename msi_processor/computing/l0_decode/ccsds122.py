@@ -67,6 +67,7 @@ groups with line-accurate datation.
 from __future__ import annotations
 
 import struct
+from typing import Any
 from dataclasses import dataclass
 
 import numpy as np
@@ -81,8 +82,10 @@ GAGGLE_BLOCKS = 16
 #: Rice escape parameter value marking an uncoded (raw) gaggle.
 _RICE_ESCAPE = 31
 
-_FRAME_HDR = struct.Struct("<8sBBIIBBII")   # magic, ver, levels, height, width, bitdepth, pad_flags, seg_blocks, n_segments
-_SEG_HDR = struct.Struct("<BIBBIII")        # flags, n_blocks, bitdepth_dc, bitdepth_ac, len_dc, len_bda, len_ac
+_FRAME_HDR = struct.Struct(
+    "<8sBBIIBBII"
+)  # magic, ver, levels, height, width, bitdepth, pad_flags, seg_blocks, n_segments
+_SEG_HDR = struct.Struct("<BIBBIII")  # flags, n_blocks, bitdepth_dc, bitdepth_ac, len_dc, len_bda, len_ac
 
 
 @dataclass
@@ -114,6 +117,7 @@ class CompressionStats:
 # ---------------------------------------------------------------------------
 # Integer DWT 9/7-M (§3.3) — lifting, whole-sample symmetric extension
 # ---------------------------------------------------------------------------
+
 
 def _dwt1d_forward(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """One 9/7-M lifting level along the last axis (even length ≥ 4). Returns (low, high)."""
@@ -154,8 +158,8 @@ def dwt97m_forward(frame: np.ndarray, levels: int = 3) -> dict[str, np.ndarray]:
     bands: dict[str, np.ndarray] = {}
     ll = a
     for lev in range(1, levels + 1):
-        lo, hi = _dwt1d_forward(ll)                      # along width
-        llc, lhc = _dwt1d_forward(lo.swapaxes(-1, -2))   # along height of low part
+        lo, hi = _dwt1d_forward(ll)  # along width
+        llc, lhc = _dwt1d_forward(lo.swapaxes(-1, -2))  # along height of low part
         hlc, hhc = _dwt1d_forward(hi.swapaxes(-1, -2))
         ll = llc.swapaxes(-1, -2)
         bands[f"HL{lev}"] = hlc.swapaxes(-1, -2)
@@ -182,6 +186,7 @@ def dwt97m_inverse(bands: dict[str, np.ndarray], levels: int = 3) -> np.ndarray:
 # Block/family gather & scatter (§4.1)
 # ---------------------------------------------------------------------------
 
+
 def _gather_blocks(bands: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     """Subbands → per-block coefficients: ``(dc (nb,), ac (nb, 63))`` in raster block order."""
     ll = bands["LL3"]
@@ -202,7 +207,8 @@ def _scatter_blocks(dc: np.ndarray, ac: np.ndarray, h8: int, w8: int) -> dict[st
     bands = {"LL3": dc.reshape(h8, w8)}
     ac3 = ac.reshape(h8, w8, 63)
     for i, fam in enumerate(("HL", "LH", "HH")):
-        seg = ac3[:, :, i * 21:(i + 1) * 21]
+        lo, hi = i * 21, (i + 1) * 21
+        seg = ac3[:, :, lo:hi]
         bands[f"{fam}3"] = seg[:, :, 0]
         bands[f"{fam}2"] = seg[:, :, 1:5].reshape(h8, w8, 2, 2).transpose(0, 2, 1, 3).reshape(h8 * 2, w8 * 2)
         bands[f"{fam}1"] = seg[:, :, 5:21].reshape(h8, w8, 4, 4).transpose(0, 2, 1, 3).reshape(h8 * 4, w8 * 4)
@@ -212,6 +218,7 @@ def _scatter_blocks(dc: np.ndarray, ac: np.ndarray, h8: int, w8: int) -> dict[st
 # ---------------------------------------------------------------------------
 # Bit I/O
 # ---------------------------------------------------------------------------
+
 
 class _BitWriter:
     """Accumulates 0/1 bit arrays; packs to bytes at the end."""
@@ -245,7 +252,8 @@ class _BitReader:
         self._pos = 0
 
     def bits(self, n: int) -> np.ndarray:
-        out = self._bits[self._pos:self._pos + n]
+        lo, hi = self._pos, self._pos + n
+        out = self._bits[lo:hi]
         if out.size != n:
             raise ValueError("bitstream underrun")
         self._pos += n
@@ -260,7 +268,8 @@ class _BitReader:
 
     def unary(self, count: int) -> np.ndarray:
         """Read ``count`` unary-coded values (q ones terminated by a zero each)."""
-        zeros = np.flatnonzero(self._bits[self._pos:] == 0)
+        pos = self._pos
+        zeros = np.flatnonzero(self._bits[pos:] == 0)
         if zeros.size < count:
             raise ValueError("bitstream underrun (unary)")
         ends = zeros[:count]
@@ -273,6 +282,7 @@ class _BitReader:
 # ---------------------------------------------------------------------------
 # Rice/DPCM coding of DC coefficients and per-block BitDepthAC (§4.3 / §4.4)
 # ---------------------------------------------------------------------------
+
 
 def _zigzag(d: np.ndarray) -> np.ndarray:
     return np.where(d >= 0, d << 1, (-d << 1) - 1).astype(np.int64)
@@ -290,7 +300,8 @@ def _rice_encode(w: _BitWriter, vals: np.ndarray, raw_bits: int) -> None:
     """
     vals = np.asarray(vals, dtype=np.int64)
     for g0 in range(0, vals.size, GAGGLE_BLOCKS):
-        g = vals[g0:g0 + GAGGLE_BLOCKS]
+        g_hi = g0 + GAGGLE_BLOCKS
+        g = vals[g0:g_hi]
         best_k, best_cost = _RICE_ESCAPE, raw_bits * g.size
         for k in range(min(raw_bits + 1, _RICE_ESCAPE)):
             cost = int((g >> k).sum()) + g.size * (1 + k)
@@ -314,11 +325,13 @@ def _rice_decode(r: _BitReader, count: int, raw_bits: int) -> np.ndarray:
         n = min(GAGGLE_BLOCKS, count - g0)
         k = int(r.uints(1, 5)[0])
         if k == _RICE_ESCAPE:
-            out[g0:g0 + n] = r.uints(n, raw_bits)
+            g_hi = g0 + n
+            out[g0:g_hi] = r.uints(n, raw_bits)
         else:
             q = r.unary(n)
             rem = r.uints(n, k)
-            out[g0:g0 + n] = (q << k) | rem
+            g_hi = g0 + n
+            out[g0:g_hi] = (q << k) | rem
     return out
 
 
@@ -335,7 +348,7 @@ def _encode_dpcm(vals: np.ndarray, ref_bits: int) -> bytes:
 def _decode_dpcm(data: bytes, count: int, ref_bits: int) -> np.ndarray:
     r = _BitReader(data)
     ref = int(r.uints(1, ref_bits)[0])
-    if ref >= 1 << (ref_bits - 1):           # sign-extend two's complement
+    if ref >= 1 << (ref_bits - 1):  # sign-extend two's complement
         ref -= 1 << ref_bits
     if count == 1:
         return np.array([ref], dtype=np.int64)
@@ -351,6 +364,7 @@ def _decode_dpcm(data: bytes, count: int, ref_bits: int) -> np.ndarray:
 # AC bit-plane coder (§4.5 stage semantics; raw-packed planes — documented divergence)
 # ---------------------------------------------------------------------------
 
+
 def _encode_ac_planes(ac: np.ndarray, bda_blocks: np.ndarray, bitdepth_ac: int) -> bytes:
     """Significance / sign / refinement passes, plane-sequential, block-major scan."""
     mag = np.abs(ac)
@@ -358,15 +372,15 @@ def _encode_ac_planes(ac: np.ndarray, bda_blocks: np.ndarray, bitdepth_ac: int) 
     sig = np.zeros(ac.shape, dtype=bool)
     w = _BitWriter()
     for b in range(bitdepth_ac - 1, -1, -1):
-        elig = bda_blocks > b                            # (nb,) blocks with content at this plane
+        elig = bda_blocks > b  # (nb,) blocks with content at this plane
         if not elig.any():
             continue
         plane = ((mag >> b) & 1).astype(np.uint8)
         insig = (~sig) & elig[:, None]
-        w.bits(plane[insig])                             # significance pass
+        w.bits(plane[insig])  # significance pass
         newly = insig & (plane == 1)
-        w.bits(neg[newly].astype(np.uint8))              # sign pass
-        w.bits(plane[sig & elig[:, None]])               # refinement pass
+        w.bits(neg[newly].astype(np.uint8))  # sign pass
+        w.bits(plane[sig & elig[:, None]])  # refinement pass
         sig |= newly
     return w.getvalue()
 
@@ -400,6 +414,7 @@ def _decode_ac_planes(data: bytes, bda_blocks: np.ndarray, bitdepth_ac: int, n_b
 # Segment & frame containers
 # ---------------------------------------------------------------------------
 
+
 def _need_bits_signed(vals: np.ndarray) -> int:
     """Two's-complement width covering min/max (≥ 2)."""
     lo = int(vals.min())
@@ -426,28 +441,31 @@ def _encode_segment(dc: np.ndarray, ac: np.ndarray, first: bool, last: bool) -> 
     bda_field = _encode_dpcm(bda, ref_bits=6)
     ac_field = _encode_ac_planes(ac, bda, bitdepth_ac) if bitdepth_ac else b""
     flags = (1 if first else 0) | (2 if last else 0)
-    hdr = _SEG_HDR.pack(flags, dc.size, bitdepth_dc, bitdepth_ac,
-                        len(dc_field), len(bda_field), len(ac_field))
+    hdr = _SEG_HDR.pack(flags, dc.size, bitdepth_dc, bitdepth_ac, len(dc_field), len(bda_field), len(ac_field))
     return hdr + dc_field + bda_field + ac_field
 
 
 def _decode_segment(buf: memoryview, off: int) -> tuple[np.ndarray, np.ndarray, int]:
     flags, n_blocks, bitdepth_dc, bitdepth_ac, len_dc, len_bda, len_ac = _SEG_HDR.unpack_from(buf, off)
     off += _SEG_HDR.size
-    dc = _decode_dpcm(bytes(buf[off:off + len_dc]), n_blocks, bitdepth_dc)
+    end = off + len_dc
+    dc = _decode_dpcm(bytes(buf[off:end]), n_blocks, bitdepth_dc)
     off += len_dc
-    bda = _decode_dpcm(bytes(buf[off:off + len_bda]), n_blocks, ref_bits=6)
+    end = off + len_bda
+    bda = _decode_dpcm(bytes(buf[off:end]), n_blocks, ref_bits=6)
     off += len_bda
     if bitdepth_ac:
-        ac = _decode_ac_planes(bytes(buf[off:off + len_ac]), bda, bitdepth_ac, n_blocks)
+        end = off + len_ac
+        ac = _decode_ac_planes(bytes(buf[off:end]), bda, bitdepth_ac, n_blocks)
     else:
         ac = np.zeros((n_blocks, 63), dtype=np.int64)
     off += len_ac
     return dc, ac, off
 
 
-def compress_frame(dn: np.ndarray, *, pixel_bit_depth: int = 12,
-                   segment_blocks: int | None = None) -> tuple[bytes, CompressionStats]:
+def compress_frame(
+    dn: np.ndarray, *, pixel_bit_depth: int = 12, segment_blocks: int | None = None
+) -> tuple[bytes, CompressionStats]:
     """Losslessly compress a 2-D DN frame → ``(payload, stats)``.
 
     ``segment_blocks`` defaults to one block row (``width // 8``), aligning each segment
@@ -465,14 +483,25 @@ def compress_frame(dn: np.ndarray, *, pixel_bit_depth: int = 12,
         a = np.pad(a, ((0, pad_h), (0, pad_w)), mode="reflect")
     bands = dwt97m_forward(a, levels=3)
     dc, ac = _gather_blocks(bands)
-    h8, w8 = a.shape[0] // 8, a.shape[1] // 8
+    w8 = a.shape[1] // 8
     if segment_blocks is None:
         segment_blocks = w8
     segment_blocks = max(1, int(segment_blocks))
     n_blocks = dc.size
     seg_bounds = list(range(0, n_blocks, segment_blocks))
-    parts = [_FRAME_HDR.pack(MAGIC, _VERSION, 3, a.shape[0], a.shape[1], pixel_bit_depth,
-                             (pad_h << 4) | pad_w, segment_blocks, len(seg_bounds))]
+    parts = [
+        _FRAME_HDR.pack(
+            MAGIC,
+            _VERSION,
+            3,
+            a.shape[0],
+            a.shape[1],
+            pixel_bit_depth,
+            (pad_h << 4) | pad_w,
+            segment_blocks,
+            len(seg_bounds),
+        )
+    ]
     hdr_bytes = len(parts[0]) + _SEG_HDR.size * len(seg_bounds)
     dc_b = bda_b = ac_b = 0
     for i, s0 in enumerate(seg_bounds):
@@ -517,7 +546,7 @@ def decompress_frame(payload: bytes | memoryview) -> np.ndarray:
     frame = dwt97m_inverse(bands, levels=levels)
     pad_h, pad_w = pad_flags >> 4, pad_flags & 0xF
     if pad_h or pad_w:
-        frame = frame[:hh - pad_h, :ww - pad_w]
+        frame = frame[: hh - pad_h, : ww - pad_w]
     return frame.astype(np.uint16)
 
 
@@ -536,24 +565,38 @@ def segment_byte_bounds(payload: bytes | memoryview) -> list[int]:
     return bounds
 
 
-def parse_segment_headers(payload: bytes | memoryview) -> dict:
+def parse_segment_headers(payload: bytes | memoryview) -> dict[str, Any]:
     """Header inventory of a compressed stream (frame fields + per-segment Part-1A content)."""
     buf = memoryview(payload)
     magic, ver, levels, hh, ww, bd, pad_flags, seg_blocks, n_segments = _FRAME_HDR.unpack_from(buf, 0)
     if magic != MAGIC:
         raise ValueError("not a C122LS stream")
     out = {
-        "version": ver, "dwt_levels": levels, "height": hh, "width": ww,
-        "pixel_bit_depth": bd, "pad_h": pad_flags >> 4, "pad_w": pad_flags & 0xF,
-        "segment_blocks": seg_blocks, "n_segments": n_segments, "segments": [],
+        "version": ver,
+        "dwt_levels": levels,
+        "height": hh,
+        "width": ww,
+        "pixel_bit_depth": bd,
+        "pad_h": pad_flags >> 4,
+        "pad_w": pad_flags & 0xF,
+        "segment_blocks": seg_blocks,
+        "n_segments": n_segments,
+        "segments": [],
     }
     off = _FRAME_HDR.size
     for _ in range(n_segments):
         flags, n_blocks, bdc, bac, ldc, lbda, lac = _SEG_HDR.unpack_from(buf, off)
-        out["segments"].append({
-            "start_img": bool(flags & 1), "end_img": bool(flags & 2), "n_blocks": n_blocks,
-            "bitdepth_dc": bdc, "bitdepth_ac": bac,
-            "dc_bytes": ldc, "bitdepth_ac_bytes": lbda, "ac_bytes": lac,
-        })
+        out["segments"].append(
+            {
+                "start_img": bool(flags & 1),
+                "end_img": bool(flags & 2),
+                "n_blocks": n_blocks,
+                "bitdepth_dc": bdc,
+                "bitdepth_ac": bac,
+                "dc_bytes": ldc,
+                "bitdepth_ac_bytes": lbda,
+                "ac_bytes": lac,
+            }
+        )
         off += _SEG_HDR.size + ldc + lbda + lac
     return out

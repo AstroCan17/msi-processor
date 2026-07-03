@@ -31,8 +31,8 @@ produce). :func:`decode_source_packets` is the explicit fail-stop seam.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from struct import error as struct_error
 from dataclasses import dataclass, field
+from struct import error as struct_error
 from typing import Any, Optional
 
 import numpy as np
@@ -232,9 +232,7 @@ def decode_source_packets(raw: Any, codec_spec: Any) -> dict[str, IntArray]:
         try:
             frames = ground_decode.decode_canonical_frames(streams)
         except (ValueError, struct_error) as exc:
-            raise L0DecodeError(
-                f"canonical L0 ground decode failed: {exc}", stage=_STAGE
-            ) from exc
+            raise L0DecodeError(f"canonical L0 ground decode failed: {exc}", stage=_STAGE) from exc
         return {b: np.asarray(f, dtype=np.uint16) for b, f in frames.items()}
     raise L0DecodeError(
         "the Level-0 source-packet decode body is sensor-private and profile-bound "
