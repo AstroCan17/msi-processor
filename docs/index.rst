@@ -24,6 +24,7 @@ Welcome to the msi-processor documentation!
    :caption: User documentation:
 
    CSC DPR Reference Web Site <https://eopf.copernicus.eu/>
+   pipeline
    results
    sim
    sum/index

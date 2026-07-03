@@ -645,6 +645,7 @@ JSON-Schema controlled; invalid/incomplete ⇒ `ProfileValidationError` with dia
 | Item id | Description | Representation |
 |---|---|---|
 | CLI (project) | `msi-processor <payload.{yaml,json}>` → `C-COM-CLI.main(argv)` | argv |
+| Pipeline driver | `python scripts/run_pipeline.py <store> [--mode nominal\|calibration] [--phases …]` — the phase-structured chain driver over a data-store working copy | argv |
 | CLI (CPM) | `eopf trigger <payload>` (CPM console script) | argv |
 | Python API | `EORunner().run_from_file(payload_file, working_dir=None)` / `EORunner().run(payload)` / direct PU `run(...)` (table <5.3.4>A) | function call |
 | inputs | triggering payload (<5.3.5>) + config/profile files | files/URIs |
