@@ -37,7 +37,7 @@ Modes
      - … ``toa → coregister → georeference → atmospheric → pansharpen`` …
      - \+ L1C / L2A (demo geo/atmospheric ADFs — flagged in the report)
    * - ``--mode calibration``
-     - ``fetch-store → l0-decode → radiometric-cal → cal-validate → report``
+     - ``fetch-store → cal-decode → radiometric-cal → cal-validate → report``
      - the derived-NUC product (PSFD ``_NUC``) + the coefficient cross-check
 
 Usage
@@ -59,12 +59,15 @@ evidence under ``<store>/report/`` and the ``report`` phase assembles
 Calibration mode
 ----------------
 
-The calibration mode consumes the producer's raw calibration *acquisitions*
-(``inputs/calibration/{dark,flatfield}.zarr`` from the data-store), derives the NUC in
-the ``radiometric`` unit's **calibration mode** and cross-checks it against the
-producer-derived coefficients (``cal-validate``). On the shared synthetic set the two
-derivations agree to float32 precision (per-band gain RMSE ≈ 6e-08) — the
-producer-acquires / consumer-derives loop closes over the data-store.
+The calibration campaign arrives **exactly like any downlink**: the producer packages the
+dark (``S02MSIDCA``, operation mode ``DASC``) and Lambertian sun-diffuser (``S02MSISCA``,
+``ABSR``) acquisitions as canonical L0 products (CCSDS-122 compressed ISPs, PSFD names,
+operation-mode metadata). ``cal-decode`` ground-decodes both through ``L0DecodeUnit``
+(the REQ-F-L0-06 path in operational use), ``radiometric-cal`` derives the NUC in the
+``radiometric`` unit's **calibration mode** on the diffuser datatake, and ``cal-validate``
+cross-checks it against the producer-derived cal-DB — both sides derive from the same
+(bit-exactly carried) frames, so agreement to float32 precision is expected. The
+producer-acquires → downlink → consumer-derives loop closes over the data-store.
 
 CI
 --
