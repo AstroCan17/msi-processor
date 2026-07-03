@@ -382,7 +382,7 @@ product-stats:
   before_script:
     - pip install .
     - rm -rf /tmp/raw-generator
-    - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/e2es/s2-msi-raw-generator.git" /tmp/raw-generator
+    - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/ipf/s2-msi-raw-generator.git" /tmp/raw-generator
     - pip install -e /tmp/raw-generator
   script:
     - python /tmp/raw-generator/scripts/run_pipeline.py results-store --synthetic
