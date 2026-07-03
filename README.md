@@ -96,8 +96,8 @@ the **Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB
 RGB = B04/B03/B02, per-channel percentile stretch. The demo scene is a flat field, so the
 stretch reveals the residual PRNU striping + noise texture rather than a landscape.
 
-Per-band statistics of the produced product (`scripts/product_stats.py`, the non-referential
-ALG-QA metrics of `msi_processor/common/metrics.py`):
+Per-band statistics of the produced product (the pipeline's `stats` phase — the
+non-referential ALG-QA metrics of `msi_processor/common/metrics.py`):
 
 | Band | mean (refl.) | std | variance | SNR (dB) |
 |---|---|---|---|---|
@@ -113,12 +113,16 @@ scene — the absolute radiometric scale survives the full DN → radiance → r
 on a flat field the std *is* the residual instrument texture, so SNR ranks the bands by their
 noise model + PRNU amplitude. The **referential** accuracy figures (RMSE vs a calibrated
 reference — `RAD_ACC`, `GEO_CE90`/`BAND_COREG`, `BOA_ACC`) are AR-gated and validated on
-operator data (V&V report); `product_stats.py --reference` computes them when a reference is
-available. A second E2E result — the real-L1A **bit-identity** run through `l0_decode`
+operator data (V&V report). A second E2E result — the real-L1A **bit-identity** run through `l0_decode`
 (L1A′ ≡ L1A, 13/13 bands) — is documented in the generator's validation pages.
 
-Reproduce with the manual **`product-stats`** CI job (produces the L1B through the real chain
-and artifacts this table + quicklook), or the generator's `scripts/run_pipeline.py --synthetic`.
+Reproduce with the manual **`pipeline-nominal`** CI job, or locally:
+`python scripts/run_pipeline.py <store>` — the repository's single driver (phases
+`fetch-store → l0-decode → radiometric → enhancement → toa → stats → report`; inputs pulled
+from the shared [ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store) registry).
+`--mode calibration` runs the radiometric **calibration mode** instead: it derives the NUC
+from the producer's dark+flatfield acquisitions and cross-validates it against the
+producer-derived coefficients (`cal-validate`).
 
 ## Project Structure
 
