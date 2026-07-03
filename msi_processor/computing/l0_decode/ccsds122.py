@@ -67,8 +67,8 @@ groups with line-accurate datation.
 from __future__ import annotations
 
 import struct
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
