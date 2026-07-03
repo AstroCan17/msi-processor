@@ -35,7 +35,7 @@ The generator's open-container L0 + calibration-database ADFs pushed through
    *texture*: per-column striping is the impressed PRNU pattern, the speckle is
    shot/read noise.
 
-Per-band statistics (``scripts/product_stats.py``, the non-referential ALG-QA metrics
+Per-band statistics (the pipeline's ``stats`` phase, the non-referential ALG-QA metrics
 of ``msi_processor/common/metrics.py`` — SDD <5.4.1>; produced by the manual
 ``product-stats`` CI job, 2026-07-02):
 
@@ -104,14 +104,14 @@ Validation status
   vs a calibrated reference — REQ-P-01 ``RAD_ACC``; geometric ``GEO_CE90`` /
   ``BAND_COREG`` — REQ-P-02; ``BOA_ACC`` — REQ-P-03) are validated on operator data
   at AR and are deliberately **not** quoted here (see the
-  :doc:`V&V report <compliance/vv-report>`). ``product_stats.py --reference``
-  already computes them once a reference product is available.
+  :doc:`V&V report <compliance/vv-report>`). the ``stats`` phase computes them
+  once a reference product is available.
 
 Reproduce
 ---------
 
-Run the manual **product-stats** CI job (integration-tests stage): it produces the
-demo L1B through the real chain via the generator's E2E driver and artifacts the
-statistics table and the quicklook shown here. Locally (eopf environment):
-``python <generator>/scripts/run_pipeline.py <store> --synthetic`` then
-``python scripts/product_stats.py <store>/l1b/S02MSIL1B_*.zarr``.
+Run the manual **pipeline-nominal** CI job (integration-tests stage): the repository's
+single driver pulls the inputs from the shared ``ipf/data-store`` registry, runs
+``l0-decode → radiometric → enhancement → toa → stats`` and artifacts the statistics
+table. Locally (eopf environment): ``python scripts/run_pipeline.py <store>``;
+``--mode calibration`` derives and cross-validates the NUC instead.
