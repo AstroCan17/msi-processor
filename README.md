@@ -89,9 +89,9 @@ actions** — the Tier-C numeric performance budgets are validated on operator d
 Output of the real **L0→L1B** end-to-end run (`l0_decode → radiometric → enhancement → toa`,
 `eopf==2.8.1`, `nominal` mode): a persisted **L1B TOA-reflectance** EOPF product, produced from
 the **Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB ADFs
-(see `data/input/`). Full analysis on the docs site: *Results* page.
+(inputs from the shared [ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store)). Full analysis on the docs site: *Results* page.
 
-![L1B TOA reflectance quicklook](data/output/quicklook/l1b_rgb.png)
+![L1B TOA reflectance quicklook](docs/_static/results/l1b_rgb.png)
 
 RGB = B04/B03/B02, per-channel percentile stretch. The demo scene is a flat field, so the
 stretch reveals the residual PRNU striping + noise texture rather than a landscape.
@@ -123,6 +123,33 @@ from the shared [ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-stor
 `--mode calibration` runs the radiometric **calibration mode** instead: it derives the NUC
 from the producer's dark+flatfield acquisitions and cross-validates it against the
 producer-derived coefficients (`cal-validate`).
+
+## Pipeline
+
+Everything runs through the **single driver** `scripts/run_pipeline.py`: a phase-structured,
+idempotent pipeline over one data-store working copy (inputs pulled from the shared
+[ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store) registry; products carry
+EOPF PSFD §3 names).
+
+| Mode | Phases | Products |
+|---|---|---|
+| **`--mode nominal`** (default) | `fetch-store → l0-decode → radiometric → enhancement → toa → stats → report` | PSFD-named L1A + L1B (TOA reflectance) + QA statistics |
+| nominal + **`--full`** | … `toa → coregister → georeference → atmospheric → pansharpen → stats …` | + L1C / L2A (demo geo/atmospheric ADFs — flagged in the report) |
+| **`--mode calibration`** | `fetch-store → l0-decode → radiometric-cal → cal-validate → report` | derived-NUC product (PSFD `_NUC`) + consumer-vs-producer coefficient cross-check |
+
+```bash
+python scripts/run_pipeline.py <store>                        # nominal chain
+python scripts/run_pipeline.py <store> --full                 # + L1C/L2A (demo geo ADFs)
+python scripts/run_pipeline.py <store> --mode calibration     # derive + cross-validate the NUC
+python scripts/run_pipeline.py <store> --phases stats         # QA table of the persisted L1B
+python scripts/run_pipeline.py <store> --phases publish-store --publish-version <X.Y.Z>
+```
+
+The calibration mode consumes the producer's raw calibration *acquisitions*
+(`inputs/calibration/{dark,flatfield}.zarr` from the data-store), derives the NUC in the
+`radiometric` unit's **calibration mode** and cross-checks it against the producer-derived
+coefficients — on the shared synthetic set the two agree to float32 precision
+(gain RMSE ≈ 6e-08). CI: the manual **`pipeline-nominal`** / **`pipeline-calibration`** jobs.
 
 ## Project Structure
 

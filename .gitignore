@@ -136,16 +136,10 @@ dmypy.json
 # VS Code
 .vscode/
 
-# EOPF cluster data folder + E2E products are large — ignore /data, but keep the tracked E2E skeleton
-# (folder structure, READMEs, the input symlink, and the small quicklook PNGs). Large .zarr stays out.
-/data
-!/data/
-!/data/**/
-!/data/input/.gitkeep
-!/data/input/README.md
-!/data/input/raw_generator_output
-!/data/output/README.md
-!/data/output/**/.gitkeep
-!/data/output/quicklook/*.png
+# Large zarr products never enter git.
 *.zarr/
 *.zarr.zip
+
+# All data lives in the shared ipf/data-store registry; local working stores are untracked.
+data/
+results-store/
