@@ -380,7 +380,7 @@ pipeline-nominal:
   before_script:
     - pip install .
   script:
-    - python scripts/run_pipeline.py results-store --mode nominal
+    - python scripts/run_pipeline.py results-store --mode nominal --bit-depth 16
   artifacts:
     paths:
       - results-store/report/

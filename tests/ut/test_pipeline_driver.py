@@ -40,7 +40,7 @@ def test_psfd_name_round_trips():
     assert (fields["duration"], fields["unit"], fields["relative_orbit"]) == (1, "A", 45)
     with_suffix = drv.psfd_name("S02MSIL1A", "20240403T102415", 1, "A", 45, z_suffix="NUC")
     assert drv.parse_psfd_name(with_suffix)["z_suffix"] == "NUC"
-    assert {"S02MSIL1C", "S02MSIL2A"} <= set(drv.TYPE_CODES)
+    assert {"S02MSIL1C", "S02MSIL2A", "S02MSIDCA", "S02MSISCA"} <= set(drv.TYPE_CODES)
     with pytest.raises(ValueError):
         drv.psfd_name("S02MSIXXX", "20240403T102415", 1, "A", 45)
 
@@ -53,7 +53,8 @@ def test_store_paths_layout(tmp_path):
 
 def test_default_phase_sets():
     assert drv.NOMINAL_PHASES[0] == "fetch-store" and drv.NOMINAL_PHASES[-1] == "report"
-    assert "radiometric-cal" in drv.CALIBRATION_PHASES and "cal-validate" in drv.CALIBRATION_PHASES
+    assert "cal-decode" in drv.CALIBRATION_PHASES and "radiometric-cal" in drv.CALIBRATION_PHASES
+    assert "cal-validate" in drv.CALIBRATION_PHASES
     assert all(p in drv.PHASES for p in drv.NOMINAL_PHASES + drv.CALIBRATION_PHASES + drv.FULL_EXTRA)
 
 
