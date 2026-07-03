@@ -371,26 +371,35 @@ integration-tests:
       - ${TEST_PROJECT}/${REPORTS}/
       - ${TEST_PROJECT}/.coverage
 
-# Manual results job: produce the demo L1B through the real chain (generator
-# open-container L0 + cal-DB -> l0_decode -> radiometric -> enhancement -> toa via the
-# generator's E2E driver) and artifact the per-band QA statistics + quicklook that feed
-# the README / docs "Results" section.
-product-stats:
+# Manual pipeline jobs: the repository's single driver over the shared data-store
+# (no producer clone needed — inputs come from the ipf/data-store registry).
+pipeline-nominal:
   stage: integration tests
   timeout: 30m
   needs: []
   before_script:
     - pip install .
-    - rm -rf /tmp/raw-generator
-    - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/ipf/s2-msi-raw-generator.git" /tmp/raw-generator
-    - pip install -e /tmp/raw-generator
   script:
-    - python /tmp/raw-generator/scripts/run_pipeline.py results-store --synthetic
-    - python scripts/product_stats.py results-store/l1b/S02MSIL1B_*.zarr | tee product_stats.md
+    - python scripts/run_pipeline.py results-store --mode nominal
   artifacts:
     paths:
-      - product_stats.md
-      - results-store/quicklook/
+      - results-store/report/
+    expire_in: 1 week
+  rules:
+    - when: manual
+      allow_failure: true
+
+pipeline-calibration:
+  stage: integration tests
+  timeout: 30m
+  needs: []
+  before_script:
+    - pip install .
+  script:
+    - python scripts/run_pipeline.py results-store --mode calibration
+  artifacts:
+    paths:
+      - results-store/report/
     expire_in: 1 week
   rules:
     - when: manual
