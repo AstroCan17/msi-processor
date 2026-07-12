@@ -89,7 +89,7 @@ actions** — the Tier-C numeric performance budgets are validated on operator d
 Output of the real **L0→L1B** end-to-end run (`l0_decode → radiometric → enhancement → toa`,
 `eopf==2.8.1`, `nominal` mode): a persisted **L1B TOA-reflectance** EOPF product, produced from
 the **Sentinel-2 MSI Synthetic Raw Data Generator**'s open-container L0 + cal-DB ADFs
-(inputs from the shared [ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store)). Full analysis on the docs site: *Results* page.
+(inputs from the shared `ipf/data-store`). Full analysis on the docs site: *Results* page.
 
 ![L1B TOA reflectance quicklook](docs/_static/results/l1b_rgb.png)
 
@@ -119,7 +119,7 @@ operator data (V&V report). A second E2E result — the real-L1A **bit-identity*
 Reproduce with the manual **`pipeline-nominal`** CI job, or locally:
 `python scripts/run_pipeline.py <store>` — the repository's single driver (phases
 `fetch-store → l0-decode → radiometric → enhancement → toa → stats → report`; inputs pulled
-from the shared [ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store) registry).
+from the shared `ipf/data-store` registry).
 `--mode calibration` runs the radiometric **calibration mode** instead: it derives the NUC
 from the producer's dark+flatfield acquisitions and cross-validates it against the
 producer-derived coefficients (`cal-validate`).
@@ -128,7 +128,7 @@ producer-derived coefficients (`cal-validate`).
 
 Everything runs through the **single driver** `scripts/run_pipeline.py`: a phase-structured,
 idempotent pipeline over one data-store working copy (inputs pulled from the shared
-[ipf/data-store](https://gitlab.eopf.copernicus.eu/ipf/data-store) registry; products carry
+`ipf/data-store` registry; products carry
 EOPF PSFD §3 names).
 
 | Mode | Phases | Products |
@@ -165,16 +165,12 @@ This project is organized as follows:
 
 The following tools are used by this project:
 
-* `.gitlab-ci.yml`: GitLab CI pipeline including the following tools:
-  * mypy: Static type checker.
-  * isort: Import formatter.
-  * black: Python code formatter.
-  * bandit: Common security issuer.
-  * flake8: Python code linter.
-  * xenon: Complexity monitor.
-  * Sonarqube: Quality check.
-  * pip-audit: Dependency vulnerability (CVE) scanner.
-  * sphinx: Document generation.
+* `.github/workflows/`: GitHub Actions pipelines.
+  * `ci.yml` — lint & format (flake8 / black / isort), unit tests (pytest,
+    coverage) and wheel build.
+  * `docs.yml` — Sphinx build and deploy to GitHub Pages.
+* Local quality tooling (declared in `pyproject.toml` extras): mypy (typing),
+  bandit (security), xenon (complexity), pip-audit (dependency CVEs).
 * `pre-commit-config.yaml`: Pre-commit hooks executed on commits.
 * `pyproject.toml`: Build system requirements for Python.
 * `docs/conf.py`: Sphinx documentation generator configuration.
@@ -182,7 +178,7 @@ The following tools are used by this project:
 ## Documentation
 
 The `msi-processor` documentation is available online at
-https://ipf.pages.eopf.copernicus.eu/msi-processor.
+https://astrocan17.github.io/msi-processor/.
 
 ## Build
 
@@ -192,40 +188,25 @@ To build the Python module of the msi-processor project using `wheel`, run:
 pip wheel -w dist --no-deps .
 ```
 
-The GitLab CI pipeline will also automatically build the package.
+The `build` job in `ci.yml` also builds the wheel on every push.
 
 ## Run tests
 
-To execute the tests locally using `pytests`, run:
+To execute the tests locally using `pytest`, run:
 
 ``` python
-python -m pytest tests/
+python -m pytest -m unit tests/
 ```
 
-The GitLab CI pipeline will also automatically run the unit and
-integration tests of the project.
-
-## Packaging
-
-The project's Python package can be uploaded into GitLab's package registry
-using `twine`. Please see GitLab's project settings for the TWINE credentials
-and the other environment variables:
-
-``` python
-TWINE_PASSWORD=${CI_REGISTRY_PASSWORD}
-TWINE_USERNAME=${CI_REGISTRY_USER}
-python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
-```
-
-The GitLab CI pipeline will also automatically publish the package to
-GitLab's package registry when the pipeline is run for a tag.
+The `test` job in `ci.yml` also runs the unit tests on every push and pull
+request.
 
 ## Documentation generation
 
-The project's documentation can be generated using Sphinx. The GitLab CI
-pipeline will generate and deploy the documentation when run for the
-default branch. It will generate the documentation accessible through
-Gitlab Pages from project's `docs` folder.
+The project's documentation is generated with Sphinx. The `docs.yml` GitHub
+Actions workflow builds the site and deploys it to **GitHub Pages** on pushes to
+`main` (and build-only validation on pull requests), serving the content from
+the project's `docs` folder.
 
 The generation of the API documentation from the Python docstrings included in
 the source code is included in the documentation generation process.
