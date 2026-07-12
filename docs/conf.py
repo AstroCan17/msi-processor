@@ -74,7 +74,7 @@ templates_path = ["_templates"]
 # a list of builtin themes.
 html_theme = "sphinx_book_theme"
 html_theme_options = {
-    "repository_url": "https://gitlab.eopf.copernicus.eu/ipf/msi-processor",
+    "repository_url": "https://github.com/AstroCan17/msi-processor",
     "repository_branch": "main",
     "use_edit_page_button": True,
     # The 'open issue' button is not yet supported for GitLab
