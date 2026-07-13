@@ -141,5 +141,6 @@ dmypy.json
 *.zarr.zip
 
 # All data lives in the shared ipf/data-store registry; local working stores are untracked.
+# Runtime datasets fetched from private GitHub data-repo releases stay untracked too.
 data/
 results-store/

@@ -124,6 +124,21 @@ from the shared `ipf/data-store` registry).
 from the producer's dark+flatfield acquisitions and cross-validates it against the
 producer-derived coefficients (`cal-validate`).
 
+## Codespaces + private dataset setup
+
+Use **public code + private data repo** for GitHub Codespaces:
+
+- `AstroCan17/msi-processor` (public): code
+- `AstroCan17/ipf-data` (private): MSI release tag `datasets-msi-v1`
+
+The devcontainer fetches `input-data.tar.gz` into `data/` when `DATA_REPO_PAT` is set.
+Run the pipeline against the fetched store:
+
+```bash
+python scripts/run_pipeline.py data
+make data-sync    # force refresh from the private release
+```
+
 ## Pipeline
 
 Everything runs through the **single driver** `scripts/run_pipeline.py`: a phase-structured,
