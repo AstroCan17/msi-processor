@@ -1,0 +1,27 @@
+name: Data fetch smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".devcontainer/**"
+      - "Makefile"
+      - ".github/workflows/data-fetch-smoke.yml"
+
+jobs:
+  fetch-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch MSI dataset
+        env:
+          DATA_REPO_PAT: ${{ secrets.DATA_REPO_PAT }}
+          DATA_REPO_NAME: ipf-data
+          DATASET_TAG: datasets-msi-v1
+          DATA_DIR: data
+        run: bash .devcontainer/scripts/fetch-input-data.sh
+      - run: test -f data/.dataset_tag

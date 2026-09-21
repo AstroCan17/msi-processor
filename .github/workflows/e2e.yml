@@ -1,0 +1,40 @@
+name: E2E pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Pipeline mode
+        required: true
+        default: nominal
+        type: choice
+        options:
+          - nominal
+          - calibration
+
+jobs:
+  pipeline:
+    name: "Pipeline (${{ inputs.mode }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+      - name: Run pipeline
+        run: |
+          rm -rf results-store
+          python scripts/run_pipeline.py results-store --mode ${{ inputs.mode }} --bit-depth 16
+      - name: Upload report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-${{ inputs.mode }}-report
+          path: results-store/report/
